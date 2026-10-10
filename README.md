@@ -134,7 +134,48 @@ smbclient -L localhost -U markus
 
 Geplante Freigaben: `Scan-Standard`, `Scan-QR`, `Scan-OCR`, `Scan-Optimierung`, `Scan-Ausgang`. Eingangs- und Ausgangsordner voneinander trennen und Pipeline-Konfigurationen vor unberechtigtem SMB-Zugriff schützen. Der lokale Folder-Scanning-Mechanismus und der neuere Processor sind **verschiedene** Automatisierungswege; vor dem Produktivbetrieb pro Eingang genau einen festlegen.
 
-## 5. Geplante Verarbeitungsprofile
+## 5. Webmin zur Verwaltung der Samba-Freigaben
+
+**Stand 10.10.2026:** Webmin wurde auf dem Debian-Server `scanner` installiert und seine Weboberfläche funktioniert. Der Webmin-Dienst läuft auf Port 10000; lokaler HTTPS-Test lieferte HTTP 200.
+
+### Installation ohne Docker
+
+```bash
+sudo apt update
+sudo apt install -y curl ca-certificates gnupg
+cd /tmp
+curl -fsSLO https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repo.sh
+less webmin-setup-repo.sh  # Skript vor Ausführung prüfen
+sudo sh webmin-setup-repo.sh
+# Beim Dialog das stabile Repository mit y bestätigen
+sudo apt update
+sudo apt install -y webmin
+```
+
+Weboberfläche: `https://SERVER-IP:10000`. Ein selbstsigniertes Zertifikat kann eine Browserwarnung verursachen; die Identität des Servers prüfen. Zugriff nur aus vertrauenswürdigem LAN bzw. VPN gestatten.
+
+### Prüfung und Fehlersuche
+
+```bash
+sudo systemctl status webmin --no-pager
+sudo ss -tlnp | grep 10000
+curl -kI https://127.0.0.1:10000
+hostname -I
+```
+
+Auf dem vorhandenen Server bestätigten die Tests: `active (running)`, Listener auf `0.0.0.0:10000` und `[::]:10000` sowie `HTTP/1.0 200 Document follows`. Falls der Browser trotzdem nicht lädt: `https://SERVER-IP:10000` nutzen, ggf. Client-Netzwerk und Firewall prüfen. Ein früherer PAM-Fehler für `root` ist ein Login-Thema, nicht der Beleg für einen ausgefallenen Webserver.
+
+### Samba über Webmin verwalten
+
+1. In Webmin **Servers → Samba Windows File Sharing** öffnen.
+2. Falls nötig Samba installieren: `sudo apt install -y samba smbclient`.
+3. Für jeden Eingang eine neue SMB-Freigabe mit dem jeweiligen absoluten Verzeichnispfad anlegen (siehe Abschnitt 4B).
+4. Gastzugriff ausschalten, erlaubte Benutzer eingrenzen und Zugriffsrechte für den Verarbeitungsbenutzer `stirling` setzen.
+5. Konfiguration mit `sudo testparm -s` prüfen, `smbd` neu starten und die Freigaben mit `smbclient -L localhost -U markus` testen.
+
+**Noch nicht bestätigt:** Die fünf SMB-Freigaben sind derzeit als geplante Konfiguration dokumentiert, nicht als bereits eingerichtete und getestete Shares. Webmin ist nur die Verwaltungsoberfläche; die SMB-Freigaben stellt Samba bereit, die Verarbeitung übernimmt Stirling PDF.
+
+## 6. Geplante Verarbeitungsprofile
 
 | Eingang | Ziel |
 | --- | --- |
@@ -144,9 +185,10 @@ Geplante Freigaben: `Scan-Standard`, `Scan-QR`, `Scan-OCR`, `Scan-Optimierung`, 
 | Scan-Optimierung | PDF-Komprimierung |
 | Scan-Ausgang | Ergebnisablage über lokalen Ordner/Samba |
 
-## 6. Noch offen
+## 7. Noch offen
 
-- [ ] SMB-Variante auswählen und einrichten
+- [x] Webmin installieren und Weboberfläche testen (10.10.2026)
+- [ ] Samba-Freigaben über Webmin erstellen und testen
 - [ ] Vier Eingangsquellen und Profile testen
 - [ ] Scan-Ausgang und Originaldatei-Sicherung konfigurieren
 - [ ] QR-Code-Trennung praktisch prüfen
