@@ -6,6 +6,8 @@ from pathlib import Path
 CONFIG = Path('/etc/samba/share-manager.conf')
 SMB_CONF = Path('/etc/samba/smb.conf')
 BASE = Path('/srv/samba-shares')
+PIPELINE = Path('/opt/Stirling-PDF/pipeline')
+PRESETS = {'general': None, 'input': 'watchedFolders', 'output': 'finishedFolders'}
 NAME_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9_-]{0,39}$')
 
 def fail(msg):
@@ -51,31 +53,55 @@ def put(entries):
 
 def main():
     if os.geteuid()!=0: fail('Root-Berechtigung erforderlich')
-    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete'): fail('Ungueltige Aktion')
+    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update'): fail('Ungueltige Aktion')
     action=sys.argv[1]
     entries=read_entries()
     if action=='list':
         if len(sys.argv)!=2: fail('Ungueltige Argumente')
-        print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path','')} for n,v in sorted(entries.items())]})); return
-    if len(sys.argv)!=3: fail('Ungueltige Argumente')
+        print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path',''), 'writable':v.get('read only','no')=='no'} for n,v in sorted(entries.items())]})); return
+    if (action in ('create','update') and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3): fail('Ungueltige Argumente')
     name=sys.argv[2]
     if not NAME_RE.fullmatch(name): fail('Name: Buchstaben, Zahlen, _ oder -, maximal 40 Zeichen')
-    if action=='create':
-        if name in entries: fail('Freigabe existiert bereits')
-        if name.lower() in SMB_CONF.read_text().lower():
-            if re.search(r'^\s*\['+re.escape(name)+r'\]\s*$',SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
-        directory=BASE/name
-        if directory.exists(): fail('Zielordner existiert bereits; keine Uebernahme fremder Daten')
+    if action in ('create','update'):
+        preset=sys.argv[3]
+        if preset not in PRESETS: fail('Ungueltiger Ordnertyp')
+        writable=sys.argv[4]
+        if writable not in ('yes','no'): fail('Ungueltige Berechtigung')
+        if action=='create' and any(n.casefold()==name.casefold() for n in entries): fail('Freigabe existiert bereits')
+        if action=='update' and name not in entries: fail('Freigabe nicht gefunden')
+        if action=='create' and re.search(r'^\\s*\\['+re.escape(name)+r'\\]\\s*$',SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
         import pwd
-        try: user=pwd.getpwnam('markus')
-        except KeyError: fail('Linux-Benutzer markus nicht vorhanden')
-        BASE.mkdir(mode=0o755,parents=True)
-        directory.mkdir(mode=0o2770)
-        os.chown(directory,user.pw_uid,user.pw_gid)
-        os.chmod(directory,0o2770)
-        entries[name]={'path':str(directory),'browseable':'yes','read only':'no','valid users':'markus','force user':'markus','create mask':'0660','directory mask':'2770'}
+        try:
+            user=pwd.getpwnam('markus')
+            stirling=pwd.getpwnam('stirling')
+        except KeyError: fail('Linux-Benutzer markus oder stirling fehlt')
+        if preset=='general':
+            directory=BASE/name
+            owner=user
+        else:
+            directory=PIPELINE/PRESETS[preset]/name
+            owner=stirling
+        # Do not change ownership of an existing folder. Pipeline directories
+        # are created only if absent and are never removed by this application.
+        if action=='create' and directory.exists():
+            fail('Zielordner existiert bereits; keine automatische Uebernahme')
+        if action=='update' and entries[name].get('path')!=str(directory):
+            fail('Pfadwechsel bestehender Freigaben nicht erlaubt: erst Freigabe entfernen, dann neu erstellen')
+        if not directory.exists():
+            parent=directory.parent
+            if preset=='general':
+                BASE.mkdir(mode=0o755,parents=True,exist_ok=True)
+            elif not parent.is_dir() or parent.is_symlink():
+                fail('Stirling-PDF-Zielverzeichnis existiert nicht')
+            directory.mkdir(mode=0o2770)
+            os.chown(directory,owner.pw_uid,owner.pw_gid)
+            os.chmod(directory,0o2770)
+        if directory.is_symlink(): fail('Symbolische Links sind nicht erlaubt')
+        entries[name]={'path':str(directory),'browseable':'yes','read only':'no' if writable=='yes' else 'yes',
+                       'valid users':'markus','force user':owner.pw_name,
+                       'create mask':'0660','directory mask':'2770'}
         put(entries)
-        print(json.dumps({'ok':True,'message':'Freigabe erstellt','path':str(directory)}))
+        print(json.dumps({'ok':True,'message':'Freigabe gespeichert','path':str(directory)}))
     else:
         if name not in entries: fail('Freigabe nicht gefunden')
         del entries[name]; put(entries)
