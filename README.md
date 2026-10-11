@@ -244,13 +244,37 @@ Bei Bedarf die Automatisierung `Test` in der Weboberfläche speichern und mit ei
 | Scan-Optimierung | PDF-Komprimierung |
 | Scan-Ausgang | Ergebnisablage über lokalen Ordner/Samba |
 
-## 8. Noch offen
+## 8. Native QR-Trennung: erfolgreicher Test (12.10.2026)
+
+Die selbst entwickelte GUI-Erweiterung für den offiziellen Stirling-PDF-Quellstand `v3.1.0` wurde isoliert gebaut und funktional getestet. Die produktive Instanz auf Port 8080 ist **nicht verändert**.
+
+- Quellcheckout: `/home/markus/stirling-qr-gui-src`
+- Patch im Projekt: `patches/apply-qr-gui-v3.1.0.py`; Vorbereitung über `patches/prepare-qr-gui.sh`
+- Test-JAR: `/home/markus/stirling-qr-gui-src/app/core/build/libs/stirling-pdf-3.1.0.jar`
+- Separate Testinstanz: `/home/markus/stirling-qr-test`, gebunden an `127.0.0.1:8081` (Browserzugriff per SSH-Portweiterleitung als `http://localhost:8081`)
+- Starten im Testverzeichnis mit separatem temporären Verzeichnis und ohne Anmeldung **nur auf Loopback**:
+
+```bash
+cd ~/stirling-qr-test
+mkdir -p tmp
+java -Djava.io.tmpdir="$HOME/stirling-qr-test/tmp" \
+  -jar "$HOME/stirling-qr-gui-src/app/core/build/libs/stirling-pdf-3.1.0.jar" \
+  --server.port=8081 --server.address=127.0.0.1 --security.enableLogin=false
+```
+
+**Nachgewiesener manueller Test:** 10-seitige PDF, QR-Wert `SCAN:TEST` auf den Originalseiten 2, 5 und 7; in der GUI „Nach Seitenteiler“, „Exakter Inhalt“, `SCAN:TEST`, „QR-Code-Seite behalten“ aktiviert, Duplex deaktiviert. Vier PDFs erstellt: Originalseiten **1**, **2–4**, **5–6**, **7–10**. Der Nutzer bestätigte das Ergebnis per Screenshot; QR-Codes sind in den geteilten Dateien sichtbar.
+
+**Bekannte Einschränkung:** Das Menü „Aufteilen“ erschien zeitweise nur kurz. Die Werkzeugseite ließ sich nach erneuter Erreichbarkeit der Testinstanz direkt über `/split` öffnen. Der Navigationsfehler ist **nicht abschließend reproduziert oder behoben**. Bei unerreichbarer Testinstanz lieferte `curl` HTTP `000`; nach Neustart waren `/split` und `/api/v1/config/endpoints-availability` beide mit HTTP `200` erreichbar.
+
+**Noch nicht geprüft:** QR-Erkennung bei echten Scans, gedrehten und schiefen Seiten, schlechten Druckvorlagen, Duplexbetrieb, leeren Seiten und anderen QR-Inhalten; Integration in die automatische Ordnerverarbeitung; Sicherheits- und Regressionstests; belastbares Deployment samt Rollback. Das erfolgreiche GUI-Beispiel ist **keine** Produktionsfreigabe.
+
+## 9. Noch offen
 
 - [x] Eigene Samba-Verwaltung verwenden; kein Webmin für die Stirling-PDF-Einrichtung erforderlich
 - [x] SMB-Ordner `Scan-Eingang` und `Scan-Ausgang` erstellen und lokale Dateirechte für `stirling` testen (11.10.2026)
 - [ ] Vier ursprünglich geplante Eingangsquellen und Profile ggf. später konfigurieren
 - [ ] Erfolgreichen End-to-End-Lauf von `Test` (inkl. Ausgabedatei, OCR und Originaldatei-Verhalten) dokumentieren
-- [ ] QR-Code-Trennung praktisch prüfen
+- [x] Native QR-Code-Trennung mit digitaler Test-PDF auf Testinstanz prüfen (12.10.2026; vier korrekt getrennte PDFs)\n- [ ] QR-Code-Trennung mit echten gescannten Seiten und in der Automatisierung prüfen\n- [ ] Navigationsproblem des Aufteilen-Menüs reproduzieren bzw. beheben\n- [ ] Produktiven Rollout erst nach weiteren Tests und Backup/Rollback durchführen
 - [ ] Erst nach erfolgreichem Test ScanPro abschalten
 - [ ] Backup: `/opt/Stirling-PDF/configs`, Pipeline-Dateien, `.env`, systemd-Service, Samba-Konfiguration
 
