@@ -38,6 +38,7 @@ done
 
 log "Lokale Scanordner fuer die grafische Automatisierung vorbereiten"
 # Es werden nur lokale Verzeichnisse angelegt, KEINE Samba-Shares konfiguriert.
+# Samba-Freigaben werden getrennt mit dem eigenen Samba-Verwaltungstool gepflegt.
 # Vorhandene Ordner werden weder geloescht noch rekursiv uebernommen.
 SCAN_BASE=/srv/samba-shares
 install -d -m 755 "$SCAN_BASE"
@@ -133,6 +134,6 @@ echo "Passwort beim ersten Login sofort aendern und die Anwendung nicht ungeschu
 echo "Scan-Eingang lokal: /srv/samba-shares/Scan-Eingang"
 echo "Scan-Ausgang lokal: /srv/samba-shares/Scan-Ausgang"
 echo "WICHTIG: Das Skript erstellt KEINE Samba-Freigaben, SMB-Benutzer oder Processor-Automatisierung."
-echo "Samba ueber Webmin konfigurieren; Berechtigungen und Web-Ordnerzugriff testen."
+echo "Samba-Freigaben mit dem vorhandenen eigenen Samba-Verwaltungstool anlegen/pruefen."
 echo "Leseprobe: sudo -u stirling ls -la /srv/samba-shares/Scan-Eingang"
 echo "Loganzeige: sudo journalctl -u stirlingpdf -f"
