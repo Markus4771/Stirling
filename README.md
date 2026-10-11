@@ -274,7 +274,10 @@ java -Djava.io.tmpdir="$HOME/stirling-qr-test/tmp" \
 - [x] SMB-Ordner `Scan-Eingang` und `Scan-Ausgang` erstellen und lokale Dateirechte für `stirling` testen (11.10.2026)
 - [ ] Vier ursprünglich geplante Eingangsquellen und Profile ggf. später konfigurieren
 - [ ] Erfolgreichen End-to-End-Lauf von `Test` (inkl. Ausgabedatei, OCR und Originaldatei-Verhalten) dokumentieren
-- [x] Native QR-Code-Trennung mit digitaler Test-PDF auf Testinstanz prüfen (12.10.2026; vier korrekt getrennte PDFs)\n- [ ] QR-Code-Trennung mit echten gescannten Seiten und in der Automatisierung prüfen\n- [ ] Navigationsproblem des Aufteilen-Menüs reproduzieren bzw. beheben\n- [ ] Produktiven Rollout erst nach weiteren Tests und Backup/Rollback durchführen
+- [x] Native QR-Code-Trennung mit digitaler Test-PDF auf Testinstanz prüfen (12.10.2026; vier korrekt getrennte PDFs)
+- [ ] QR-Code-Trennung mit echten gescannten Seiten und in der Automatisierung prüfen
+- [ ] Navigationsproblem des Aufteilen-Menüs reproduzieren bzw. beheben
+- [ ] Produktiven Rollout erst nach weiteren Tests und Backup/Rollback durchführen
 - [ ] Erst nach erfolgreichem Test ScanPro abschalten
 - [ ] Backup: `/opt/Stirling-PDF/configs`, Pipeline-Dateien, `.env`, systemd-Service, Samba-Konfiguration
 
