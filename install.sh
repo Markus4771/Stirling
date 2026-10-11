@@ -21,7 +21,7 @@ trap 'echo "FEHLER in Zeile $LINENO. Details oben pruefen." >&2' ERR
 export DEBIAN_FRONTEND=noninteractive
 log "Systempakete installieren"
 apt-get update
-apt-get install -y ca-certificates curl openjdk-25-jre-headless libreoffice tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng ocrmypdf poppler-utils qpdf pngquant python3 python3-opencv fonts-dejavu-core
+apt-get install -y ca-certificates curl openjdk-25-jre-headless libreoffice tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng ocrmypdf poppler-utils qpdf pngquant python3 python3-opencv fonts-dejavu-core imagemagick
 
 java -version
 JAVA_MAJOR="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9]*\).*/\1/p')"
@@ -56,7 +56,16 @@ EOF
   chmod 600 "$INSTALL_DIR/.env"
 fi
 
-log "Verzeichnisberechtigungen sicherstellen"\nchown -R stirling:stirling "$INSTALL_DIR"\nchmod 750 "$INSTALL_DIR"\nchmod -R u+rwX "$INSTALL_DIR/pipeline"\n\nlog "systemd-Dienst anlegen"
+log "Verzeichnisberechtigungen sicherstellen"
+chown -R stirling:stirling "$INSTALL_DIR"
+chmod 750 "$INSTALL_DIR"
+chmod -R u+rwX "$INSTALL_DIR/pipeline"
+
+# Pruefen, ob Stirling mit seinen Rechten Verzeichnisse anlegen kann.
+runuser -u stirling -- mkdir -p "$INSTALL_DIR/pipeline/defaultWebUIConfigs"
+runuser -u stirling -- test -w "$INSTALL_DIR/pipeline/defaultWebUIConfigs" || die "Pipeline-Verzeichnis ist nicht beschreibbar"
+
+log "systemd-Dienst anlegen"
 cat > "$SERVICE" <<'EOF'
 [Unit]
 Description=Stirling PDF (JAR)
