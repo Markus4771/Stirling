@@ -1,7 +1,7 @@
 diff --git a/app/core/src/main/java/stirling/software/SPDF/model/api/misc/AutoSplitPdfRequest.java b/app/core/src/main/java/stirling/software/SPDF/model/api/misc/AutoSplitPdfRequest.java
 --- a/app/core/src/main/java/stirling/software/SPDF/model/api/misc/AutoSplitPdfRequest.java
 +++ b/app/core/src/main/java/stirling/software/SPDF/model/api/misc/AutoSplitPdfRequest.java
-@@ -15,4 +15,15 @@ public class AutoSplitPdfRequest extends PDFFile {
+@@ -15,3 +15,12 @@ public class AutoSplitPdfRequest extends PDFFile {
              defaultValue = "false")
      private Boolean duplexMode;
 +
@@ -17,7 +17,7 @@ diff --git a/app/core/src/main/java/stirling/software/SPDF/model/api/misc/AutoSp
 diff --git a/app/core/src/main/java/stirling/software/SPDF/controller/api/misc/AutoSplitPdfController.java b/app/core/src/main/java/stirling/software/SPDF/controller/api/misc/AutoSplitPdfController.java
 --- a/app/core/src/main/java/stirling/software/SPDF/controller/api/misc/AutoSplitPdfController.java
 +++ b/app/core/src/main/java/stirling/software/SPDF/controller/api/misc/AutoSplitPdfController.java
-@@ -252,6 +252,23 @@ public class AutoSplitPdfController {
+@@ -252,2 +252,16 @@ public class AutoSplitPdfController {
          MultipartFile file = request.getFileInput();
          boolean duplexMode = Boolean.TRUE.equals(request.getDuplexMode());
 +
@@ -34,7 +34,7 @@ diff --git a/app/core/src/main/java/stirling/software/SPDF/controller/api/misc/A
 +        if (duplexMode && keepQrPage) {
 +            throw new IllegalArgumentException("Duplex divider removal cannot keep the QR page");
 +        }
-@@ -291,7 +308,12 @@ public class AutoSplitPdfController {
+@@ -291,1 +308,6 @@ public class AutoSplitPdfController {
 -                boolean isValidQrCode = qrResult != null && VALID_QR_CONTENTS.contains(qrResult);
 +                boolean isValidQrCode = qrResult != null
 +                        && switch (mode) {
@@ -42,27 +42,27 @@ diff --git a/app/core/src/main/java/stirling/software/SPDF/controller/api/misc/A
 +                            case "exact" -> qrResult.equals(qrValue);
 +                            default -> VALID_QR_CONTENTS.contains(qrResult);
 +                        };
-@@ -307,7 +329,7 @@ public class AutoSplitPdfController {
+@@ -307,1 +329,1 @@ public class AutoSplitPdfController {
 -                if (!splitDocuments.isEmpty() && !isValidQrCode) {
 +                if (!splitDocuments.isEmpty() && (!isValidQrCode || keepQrPage)) {
 diff --git a/frontend/editor/src/core/hooks/tools/split/useSplitParameters.ts b/frontend/editor/src/core/hooks/tools/split/useSplitParameters.ts
 --- a/frontend/editor/src/core/hooks/tools/split/useSplitParameters.ts
 +++ b/frontend/editor/src/core/hooks/tools/split/useSplitParameters.ts
-@@ -18,6 +18,9 @@ export interface SplitParameters extends BaseParameters {
+@@ -18,3 +18,6 @@ export interface SplitParameters extends BaseParameters {
    allowDuplicates: boolean;
    duplexMode: boolean;
 +  qrMode: "standard" | "prefix" | "exact";
 +  qrValue: string;
 +  keepQrPage: boolean;
    splitMode?: string;
-@@ -42,6 +45,9 @@ export const defaultParameters: SplitParameters = {
+@@ -42,3 +45,6 @@ export const defaultParameters: SplitParameters = {
    allowDuplicates: false,
    duplexMode: false,
 +  qrMode: "standard",
 +  qrValue: "SCAN:",
 +  keepQrPage: false,
    splitMode: "SPLIT_ALL",
-@@ -65,7 +71,9 @@ export function validateSplitParameters(params: SplitParameters): boolean {
+@@ -65,2 +71,4 @@ export function validateSplitParameters(params: SplitParameters): boolean {
      case SPLIT_METHODS.BY_PAGE_DIVIDER:
 -      return true; // No required parameters
 +      return (params.qrMode === "standard" ||
@@ -71,7 +71,7 @@ diff --git a/frontend/editor/src/core/hooks/tools/split/useSplitParameters.ts b/
 diff --git a/frontend/editor/src/core/components/tools/split/SplitSettings.tsx b/frontend/editor/src/core/components/tools/split/SplitSettings.tsx
 --- a/frontend/editor/src/core/components/tools/split/SplitSettings.tsx
 +++ b/frontend/editor/src/core/components/tools/split/SplitSettings.tsx
-@@ -166,6 +166,32 @@ const SplitSettings = ({
+@@ -166,3 +166,31 @@ const SplitSettings = ({
    const renderByPageDividerForm = () => (
      <Stack gap="sm">
 +      <Select
@@ -106,7 +106,7 @@ diff --git a/frontend/editor/src/core/components/tools/split/SplitSettings.tsx b
 diff --git a/frontend/editor/src/core/hooks/tools/split/useSplitOperation.ts b/frontend/editor/src/core/hooks/tools/split/useSplitOperation.ts
 --- a/frontend/editor/src/core/hooks/tools/split/useSplitOperation.ts
 +++ b/frontend/editor/src/core/hooks/tools/split/useSplitOperation.ts
-@@ -77,7 +77,12 @@ export const splitToApiParams = (
+@@ -77,2 +77,7 @@ export const splitToApiParams = (
      case SPLIT_METHODS.BY_PAGE_DIVIDER:
 -      return { duplexMode: parameters.duplexMode ?? false };
 +      return {
@@ -115,7 +115,7 @@ diff --git a/frontend/editor/src/core/hooks/tools/split/useSplitOperation.ts b/f
 +        qrValue: parameters.qrValue || "",
 +        keepQrPage: parameters.keepQrPage ?? false,
 +      };
-@@ -143,6 +148,9 @@ export const splitFromApiParams = (
+@@ -143,3 +148,6 @@ export const splitFromApiParams = (
        method: SPLIT_METHODS.BY_PAGE_DIVIDER,
        duplexMode: apiParams.duplexMode ?? false,
 +      qrMode: apiParams.qrMode ?? "standard",
