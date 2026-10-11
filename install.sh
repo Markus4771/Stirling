@@ -21,7 +21,7 @@ trap 'echo "FEHLER in Zeile $LINENO. Details oben pruefen." >&2' ERR
 export DEBIAN_FRONTEND=noninteractive
 log "Systempakete installieren"
 apt-get update
-apt-get install -y ca-certificates curl openjdk-25-jre-headless libreoffice tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng ocrmypdf poppler-utils qpdf pngquant python3 python3-opencv fonts-dejavu-core imagemagick
+apt-get install -y ca-certificates curl openjdk-25-jre-headless libreoffice tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng ocrmypdf poppler-utils qpdf pngquant python3 python3-opencv fonts-dejavu-core imagemagick acl
 
 java -version
 JAVA_MAJOR="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9]*\).*/\1/p')"
@@ -34,6 +34,22 @@ fi
 install -d -o stirling -g stirling -m 750 "$INSTALL_DIR"
 for folder in configs logs pipeline/watchedFolders pipeline/finishedFolders; do
   install -d -o stirling -g stirling -m 750 "$INSTALL_DIR/$folder"
+done
+
+log "Lokale Scanordner fuer die grafische Automatisierung vorbereiten"
+# Es werden nur lokale Verzeichnisse angelegt, KEINE Samba-Shares konfiguriert.
+# Vorhandene Ordner werden weder geloescht noch rekursiv uebernommen.
+SCAN_BASE=/srv/samba-shares
+install -d -m 755 "$SCAN_BASE"
+for folder in Scan-Eingang Scan-Ausgang; do
+  scan_path="$SCAN_BASE/$folder"
+  if [[ ! -d "$scan_path" ]]; then
+    install -d -o stirling -g stirling -m 2770 "$scan_path"
+  fi
+  # ACL erlaubt Stirling Zugriff auch wenn die Freigabe spaeter
+  # z.B. markus:markus gehoert. Default-ACL fuer neue Dateien/Ordner.
+  setfacl -m u:stirling:rwx "$scan_path"
+  setfacl -m d:u:stirling:rwx "$scan_path"
 done
 
 log "Stirling PDF herunterladen"
@@ -54,6 +70,22 @@ SECURITY_ENABLELOGIN=true
 EOF
   chown stirling:stirling "$INSTALL_DIR/.env"
   chmod 600 "$INSTALL_DIR/.env"
+fi
+
+log "Ordnerzugriff fuer grafische Processor-Automatisierungen freigeben"
+# Eine bereits vorhandene Konfiguration nie ueberschreiben.
+CUSTOM_SETTINGS="$INSTALL_DIR/configs/custom_settings.yml"
+if [[ ! -e "$CUSTOM_SETTINGS" ]]; then
+  cat > "$CUSTOM_SETTINGS" <<'EOF'
+policies:
+  allowedFolderRoots:
+    - /srv/samba-shares/Scan-Eingang
+    - /srv/samba-shares/Scan-Ausgang
+EOF
+  chown stirling:stirling "$CUSTOM_SETTINGS"
+  chmod 640 "$CUSTOM_SETTINGS"
+else
+  echo "Hinweis: $CUSTOM_SETTINGS existiert bereits; allowedFolderRoots ggf. manuell pruefen."
 fi
 
 log "Verzeichnisberechtigungen sicherstellen"
@@ -98,4 +130,9 @@ echo
 echo "Weboberflaeche: http://$(hostname -I | awk '{print $1}'):8080"
 echo "Initialer Login laut Stirling-Dokumentation: admin / stirling"
 echo "Passwort beim ersten Login sofort aendern und die Anwendung nicht ungeschuetzt ins Internet stellen."
+echo "Scan-Eingang lokal: /srv/samba-shares/Scan-Eingang"
+echo "Scan-Ausgang lokal: /srv/samba-shares/Scan-Ausgang"
+echo "WICHTIG: Das Skript erstellt KEINE Samba-Freigaben, SMB-Benutzer oder Processor-Automatisierung."
+echo "Samba ueber Webmin konfigurieren; Berechtigungen und Web-Ordnerzugriff testen."
+echo "Leseprobe: sudo -u stirling ls -la /srv/samba-shares/Scan-Eingang"
 echo "Loganzeige: sudo journalctl -u stirlingpdf -f"
