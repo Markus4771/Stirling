@@ -7,7 +7,7 @@ Stand: 11.10.2026
 - Debian 13.7, Stirling PDF v3.1.0 (JAR, **kein Docker**), Java 25
 - Installation: `/opt/Stirling-PDF`
 - systemd-Dienst: `stirlingpdf.service`, Benutzer: `stirling`
-- Samba-Freigaben werden mit Webmin verwaltet
+- Samba-Freigaben werden mit dem **eigenen Samba-Verwaltungstool**, nicht mit Webmin, verwaltet
 
 ## Aktuelle Ordner
 - SMB-Eingang: `/srv/samba-shares/Scan-Eingang`
@@ -44,6 +44,11 @@ sudo systemctl restart stirlingpdf.service
 ```
 
 Der Benutzer meldete: **„jetzt geht es scheinbar“**. Ein vollständiger End-to-End-Test ist noch zu dokumentieren.
+
+## Samba-Verwaltung
+- Freigaben `Scan-Eingang` und `Scan-Ausgang` im eigenen Tool verwalten.
+- `install.sh` richtet lokale Verzeichnisse und ACLs ein, aber keine SMB-Freigaben; Integration mit dem eigenen Tool setzt eine bekannte Schnittstelle voraus.
+- Keine Webmin-Abhängigkeit.
 
 ## Nächste Aufgaben
 1. Mit frischer Test-PDF bestätigen: Eingang aufgenommen, OCR erfolgt, Datei im Ausgang, inhaltlich durchsuchbar.
