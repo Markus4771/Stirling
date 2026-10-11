@@ -112,9 +112,9 @@ Der Name ist ein Beispiel und durch den tatsächlichen Host zu ersetzen. Alterna
 
 **Wichtig:** Laut aktueller Dokumentation ist SMB in Processor als Eingangsquelle verfügbar; eine SMB-*Zielquelle* ist noch als „Coming soon“ markiert. Ausgabe daher in einen lokalen Ordner und optional über Samba exportieren.
 
-### B. Scan-Geräte sollen auf dem Debian-Server direkt in SMB-Freigaben schreiben
+### B. Scan-Geräte schreiben direkt auf SMB-Freigaben des Debian-Servers
 
-Dann wird **Samba auf Debian** benötigt. Vorgesehene Ordner:
+Samba wird über das eigene Samba-Verwaltungstool eingerichtet. Für die aktuelle Installation gelten ausschließlich die Verzeichnisse unter `/srv/samba-shares/`. Ursprünglicher Plan für weitere Profile (noch nicht der Ist-Stand):
 
 ```bash
 sudo apt install -y samba smbclient
@@ -125,7 +125,7 @@ sudo smbpasswd -a markus
 sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
 ```
 
-Die passenden Samba-Abschnitte mit `valid users = markus`, `force user = stirling` und einem jeweiligen `path` zu den Eingangsordnern müssen in `/etc/samba/smb.conf` ergänzt werden. Für den Ausgang auf `/opt/Stirling-PDF/pipeline/finishedFolders` verweisen. Anschließend:
+Die frühere Vorlage mit `force user = stirling` und Ausgaben unter `/opt/Stirling-PDF/pipeline/finishedFolders` ist **nicht** die aktuelle Konfiguration. Bereits bestehende Freigaben im eigenen Verwaltungstool nicht überschreiben. Nach Anpassungen:
 
 ```bash
 sudo testparm -s
@@ -135,46 +135,27 @@ smbclient -L localhost -U markus
 
 Geplante Freigaben: `Scan-Standard`, `Scan-QR`, `Scan-OCR`, `Scan-Optimierung`, `Scan-Ausgang`. Eingangs- und Ausgangsordner voneinander trennen und Pipeline-Konfigurationen vor unberechtigtem SMB-Zugriff schützen. Der lokale Folder-Scanning-Mechanismus und der neuere Processor sind **verschiedene** Automatisierungswege; vor dem Produktivbetrieb pro Eingang genau einen festlegen.
 
-## 5. Webmin zur Verwaltung der Samba-Freigaben
+## 5. Samba-Freigaben über das eigene Samba-Verwaltungstool
 
-**Stand 10.10.2026:** Webmin wurde auf dem Debian-Server `scanner` installiert und seine Weboberfläche funktioniert. Der Webmin-Dienst läuft auf Port 10000; lokaler HTTPS-Test lieferte HTTP 200.
+**Kein Webmin erforderlich.** Auf `scanner` wird die vorhandene eigene Samba-Verwaltungsoberfläche zur Anlage und Verwaltung von SMB-Freigaben verwendet.
 
-### Installation ohne Docker
+| Name der SMB-Freigabe | Lokaler Ordner |
+| --- | --- |
+| `Scan-Eingang` | `/srv/samba-shares/Scan-Eingang` |
+| `Scan-Ausgang` | `/srv/samba-shares/Scan-Ausgang` |
 
-```bash
-sudo apt update
-sudo apt install -y curl ca-certificates gnupg
-cd /tmp
-curl -fsSLO https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repo.sh
-less webmin-setup-repo.sh  # Skript vor Ausführung prüfen
-sudo sh webmin-setup-repo.sh
-# Beim Dialog das stabile Repository mit y bestätigen
-sudo apt update
-sudo apt install -y webmin
-```
+Die Freigaben sind bereits eingerichtet. In der Verwaltungsoberfläche Schreibzugriff für den Scanner beziehungsweise berechtigte SMB-Benutzer und passende Linux-Dateirechte sicherstellen. Für `stirling` lokalen Lese-/Schreibzugriff einrichten; ACLs ermöglichen das unabhängig vom Eigentümer. Für neu über Samba hochgeladene Dateien auch die effektiven Samba-Rechte und Vererbung prüfen.
 
-Weboberfläche: `https://SERVER-IP:10000`. Ein selbstsigniertes Zertifikat kann eine Browserwarnung verursachen; die Identität des Servers prüfen. Zugriff nur aus vertrauenswürdigem LAN bzw. VPN gestatten.
-
-### Prüfung und Fehlersuche
+Nach Änderungen an der Samba-Konfiguration:
 
 ```bash
-sudo systemctl status webmin --no-pager
-sudo ss -tlnp | grep 10000
-curl -kI https://127.0.0.1:10000
-hostname -I
+sudo testparm -s
+sudo systemctl reload smbd
+sudo -u stirling ls -la /srv/samba-shares/Scan-Eingang
+sudo -u stirling ls -la /srv/samba-shares/Scan-Ausgang
 ```
 
-Auf dem vorhandenen Server bestätigten die Tests: `active (running)`, Listener auf `0.0.0.0:10000` und `[::]:10000` sowie `HTTP/1.0 200 Document follows`. Falls der Browser trotzdem nicht lädt: `https://SERVER-IP:10000` nutzen, ggf. Client-Netzwerk und Firewall prüfen. Ein früherer PAM-Fehler für `root` ist ein Login-Thema, nicht der Beleg für einen ausgefallenen Webserver.
-
-### Samba über Webmin verwalten
-
-1. In Webmin **Servers → Samba Windows File Sharing** öffnen.
-2. Falls nötig Samba installieren: `sudo apt install -y samba smbclient`.
-3. Für jeden Eingang eine neue SMB-Freigabe mit dem jeweiligen absoluten Verzeichnispfad anlegen (siehe Abschnitt 4B).
-4. Gastzugriff ausschalten, erlaubte Benutzer eingrenzen und Zugriffsrechte für den Verarbeitungsbenutzer `stirling` setzen.
-5. Konfiguration mit `sudo testparm -s` prüfen, `smbd` neu starten und die Freigaben mit `smbclient -L localhost -U markus` testen.
-
-**Aktueller Stand (11.10.2026):** Die Freigaben `Scan-Eingang` und `Scan-Ausgang` unter `/srv/samba-shares/` sind eingerichtet. Lese- und Schreibzugriff als lokaler Benutzer `stirling` wurde geprüft. Die oben genannten fünf Freigaben sind ein ursprünglicher Plan, nicht der derzeitige Ist-Zustand. Webmin verwaltet Samba; Stirling PDF übernimmt die Verarbeitung.
+Die lokale Anwendung kann nur dann automatisiert durch `install.sh` angesprochen werden, wenn ihre Schnittstelle und Befehle bekannt sind. Das Stirling-Installationsskript bereitet lediglich die lokalen Ordner und ACLs vor. Es installiert weder Webmin noch überschreibt es vorhandene Samba-Freigaben.
 
 ## 6. Aktuelle Ordnerautomatisierung und Fehlerbehebung (11.10.2026)
 
@@ -265,7 +246,7 @@ Bei Bedarf die Automatisierung `Test` in der Weboberfläche speichern und mit ei
 
 ## 8. Noch offen
 
-- [x] Webmin installieren und Weboberfläche testen (10.10.2026)
+- [x] Eigene Samba-Verwaltung verwenden; kein Webmin für die Stirling-PDF-Einrichtung erforderlich
 - [x] SMB-Ordner `Scan-Eingang` und `Scan-Ausgang` erstellen und lokale Dateirechte für `stirling` testen (11.10.2026)
 - [ ] Vier ursprünglich geplante Eingangsquellen und Profile ggf. später konfigurieren
 - [ ] Erfolgreichen End-to-End-Lauf von `Test` (inkl. Ausgabedatei, OCR und Originaldatei-Verhalten) dokumentieren
