@@ -2,13 +2,14 @@
 
 Dokumentation für den Server `scanner` auf **Debian 13.7**, ohne Docker. Dieses Repository dokumentiert die Installation von Stirling PDF als geplanten Ersatz für ScanPro; es enthält nicht die Stirling-PDF-Quellsoftware.
 
-## Bestätigter Ist-Stand (10.10.2026)
+## Bestätigter Ist-Stand (11.10.2026)
 
 - OpenJDK 25.0.4.1
 - Stirling PDF unter `/opt/Stirling-PDF`
 - systemd-Dienst `stirlingpdf` läuft und startet automatisch
 - Weboberfläche funktioniert auf `http://SERVER-IP:8080`
-- SMB-Eingänge, Verarbeitungsprofile und automatischer Ausgang müssen noch konfiguriert/getestet werden
+- Samba-Freigaben `Scan-Eingang` und `Scan-Ausgang` sind vorhanden; lokale Lese- und Schreibtests als Benutzer `stirling` waren erfolgreich.
+- Grafische Automatisierung `Test`: Scan-Eingang → OCR & Scans bereinigen → Scan-Ausgang; nach Konfigurationsanpassung meldet der Anwender, dass es scheinbar funktioniert. Ein nachgewiesener End-to-End-Test der resultierenden PDF steht noch aus.
 
 ## 1. Debian vorbereiten
 
@@ -173,9 +174,86 @@ Auf dem vorhandenen Server bestätigten die Tests: `active (running)`, Listener 
 4. Gastzugriff ausschalten, erlaubte Benutzer eingrenzen und Zugriffsrechte für den Verarbeitungsbenutzer `stirling` setzen.
 5. Konfiguration mit `sudo testparm -s` prüfen, `smbd` neu starten und die Freigaben mit `smbclient -L localhost -U markus` testen.
 
-**Noch nicht bestätigt:** Die fünf SMB-Freigaben sind derzeit als geplante Konfiguration dokumentiert, nicht als bereits eingerichtete und getestete Shares. Webmin ist nur die Verwaltungsoberfläche; die SMB-Freigaben stellt Samba bereit, die Verarbeitung übernimmt Stirling PDF.
+**Aktueller Stand (11.10.2026):** Die Freigaben `Scan-Eingang` und `Scan-Ausgang` unter `/srv/samba-shares/` sind eingerichtet. Lese- und Schreibzugriff als lokaler Benutzer `stirling` wurde geprüft. Die oben genannten fünf Freigaben sind ein ursprünglicher Plan, nicht der derzeitige Ist-Zustand. Webmin verwaltet Samba; Stirling PDF übernimmt die Verarbeitung.
 
-## 6. Geplante Verarbeitungsprofile
+## 6. Aktuelle Ordnerautomatisierung und Fehlerbehebung (11.10.2026)
+
+### Tatsächlicher Aufbau
+
+| Komponente | Pfad / Einstellung |
+| --- | --- |
+| Betrieb | Debian, Stirling PDF als JAR (ohne Docker) |
+| Dienst | `stirlingpdf.service` (Benutzer/Gruppe: `stirling`) |
+| SMB-Eingang | `/srv/samba-shares/Scan-Eingang` |
+| SMB-Ausgang | `/srv/samba-shares/Scan-Ausgang` |
+| Grafische Automatisierung | `Test`: Ordnerquelle → `OCR & Scans bereinigen` → Ausgabeordner |
+| Legacy-Watcher | `/opt/Stirling-PDF/pipeline/watchedFolders` (separater Mechanismus) |
+
+Die SMB-Freigaben sind lokale Verzeichnisse auf dem Server `scanner`, welche per Samba im Netzwerk angeboten werden. Daher verwendet die Ordnerautomatisierung **lokale Dateipfade**.
+
+### Zugriffsrechte nachweisen
+
+Auf dem Server wurden diese Befehle **erfolgreich** ausgeführt:
+
+```bash
+sudo -u stirling ls -la /srv/samba-shares/Scan-Eingang
+sudo -u stirling ls -la /srv/samba-shares/Scan-Ausgang
+sudo -u stirling touch /srv/samba-shares/Scan-Eingang/test-stirling.txt
+sudo -u stirling touch /srv/samba-shares/Scan-Ausgang/test-stirling.txt
+sudo -u stirling rm -f /srv/samba-shares/Scan-Eingang/test-stirling.txt
+sudo -u stirling rm -f /srv/samba-shares/Scan-Ausgang/test-stirling.txt
+```
+
+Die Ordner gehören `markus:markus` und besitzen Gruppenrechte; der Benutzer `stirling` kann nachweislich Dateien lesen und erstellen. **Nicht pauschal mit `chmod 777` lösen**; für dauerhaft getrennte Benutzerrechte sind Gruppen oder ACLs vorzuziehen. Vor weiteren Änderungen `id stirling` und `getfacl` prüfen. `SupplementaryGroups=` in `systemctl show` allein beweist nicht, dass der Linux-Benutzer keine ergänzenden Gruppen hat.
+
+### Berechtigung der grafischen Automatisierung
+
+Zuvor gab es in den Service-Logs folgenden Fehler:
+
+```text
+PolicyRunner - Failed to resolve source 'folder' for policy ... (Test): /srv/samba-shares/Scan-Eingang
+```
+
+Als Abhilfe wurde in der zuvor leeren `/opt/Stirling-PDF/configs/custom_settings.yml` die Pfadfreigabe konfiguriert:
+
+```yaml
+policies:
+  allowedFolderRoots:
+    - /srv/samba-shares/Scan-Eingang
+    - /srv/samba-shares/Scan-Ausgang
+```
+
+Daraufhin Stirling PDF neu starten:
+
+```bash
+sudo systemctl restart stirlingpdf.service
+sudo systemctl status stirlingpdf.service --no-pager
+```
+
+Der Anwender meldete danach, dass die Verarbeitung **scheinbar funktioniert**. Die bestätigten Logeinträge vor der Konfigurationsänderung zeigten bereits den Start der Policy `Test`, beweisen aber noch keinen erfolgreichen Abschluss. Deshalb Ergebnisdatei und OCR-Qualität getrennt prüfen.
+
+### Legacy-Pipeline nicht mit der grafischen Automatisierung verwechseln
+
+Die wiederkehrende Warnung
+
+```text
+PipelineDirectoryProcessor - No .JSON settings file found. No processing will happen for dir /opt/Stirling-PDF/pipeline/watchedFolders/Scan-Eingang
+```
+
+betrifft die **alte dateibasierte Pipeline**. Sie ist nicht gleichbedeutend mit einem Fehler in der grafischen Automatisierung `Test`. Keine JSON-Datei nur wegen dieser Warnung erstellen, solange ausschließlich die grafische Ordnerautomatisierung genutzt wird. Pro Eingangsordner nicht versehentlich zwei konkurrierende Verarbeitungsmechanismen aktivieren.
+
+### Diagnose bei erneutem Problem
+
+```bash
+sudo systemctl status stirlingpdf.service --no-pager
+sudo journalctl -u stirlingpdf.service --since "10 minutes ago" --no-pager | grep -Ei 'PolicyRunner|Failed to resolve|folder|denied|ERROR'
+sudo -u stirling ls -la /srv/samba-shares/Scan-Eingang
+sudo -u stirling ls -la /srv/samba-shares/Scan-Ausgang
+```
+
+Bei Bedarf die Automatisierung `Test` in der Weboberfläche speichern und mit einer neuen Test-PDF ausführen. Prüfen, ob im Ausgang wirklich eine fertig bearbeitete Datei entsteht und ob die OCR durchsuchbar ist.
+
+## 7. Geplante Verarbeitungsprofile
 
 | Eingang | Ziel |
 | --- | --- |
@@ -185,12 +263,12 @@ Auf dem vorhandenen Server bestätigten die Tests: `active (running)`, Listener 
 | Scan-Optimierung | PDF-Komprimierung |
 | Scan-Ausgang | Ergebnisablage über lokalen Ordner/Samba |
 
-## 7. Noch offen
+## 8. Noch offen
 
 - [x] Webmin installieren und Weboberfläche testen (10.10.2026)
-- [ ] Samba-Freigaben über Webmin erstellen und testen
-- [ ] Vier Eingangsquellen und Profile testen
-- [ ] Scan-Ausgang und Originaldatei-Sicherung konfigurieren
+- [x] SMB-Ordner `Scan-Eingang` und `Scan-Ausgang` erstellen und lokale Dateirechte für `stirling` testen (11.10.2026)
+- [ ] Vier ursprünglich geplante Eingangsquellen und Profile ggf. später konfigurieren
+- [ ] Erfolgreichen End-to-End-Lauf von `Test` (inkl. Ausgabedatei, OCR und Originaldatei-Verhalten) dokumentieren
 - [ ] QR-Code-Trennung praktisch prüfen
 - [ ] Erst nach erfolgreichem Test ScanPro abschalten
 - [ ] Backup: `/opt/Stirling-PDF/configs`, Pipeline-Dateien, `.env`, systemd-Service, Samba-Konfiguration
