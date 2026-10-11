@@ -10,6 +10,7 @@ git clone --branch v3.1.0 --depth 1 https://github.com/Stirling-Tools/Stirling-P
 cd "$CHECKOUT"
 git apply --check "$ROOT/patches/qr-gui-v1.patch"
 git apply "$ROOT/patches/qr-gui-v1.patch"
+python3 "$ROOT/patches/fix-generated-api.py" "$CHECKOUT"
 echo "Patch applied to $CHECKOUT."
 echo "Next: regenerate tool API types (task frontend:tool-models), run checks and build."
 echo "Do not deploy until backend/frontend compilation and integration tests pass."
