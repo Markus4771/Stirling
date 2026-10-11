@@ -78,6 +78,9 @@ def main():
             fail('Interne Ordner duerfen nicht freigegeben werden')
         import pwd
         owner=pwd.getpwnam('stirling' if PIPELINE in target.parents else 'markus')
+        required='-w' if entries[name].get('read only','no')=='no' else '-r'
+        check=subprocess.run(['runuser','-u',owner.pw_name,'--','test',required,str(target)],capture_output=True)
+        if check.returncode: fail('Zielordner ist fuer Samba-Benutzer '+owner.pw_name+' nicht ausreichend berechtigt')
         entries[name]['path']=str(target)
         entries[name]['force user']=owner.pw_name
         put(entries)
