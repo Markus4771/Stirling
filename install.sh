@@ -36,10 +36,9 @@ for folder in configs logs pipeline/watchedFolders pipeline/finishedFolders; do
   install -d -o stirling -g stirling -m 750 "$INSTALL_DIR/$folder"
 done
 
-log "Lokale Scanordner fuer die grafische Automatisierung vorbereiten"
-# Es werden nur lokale Verzeichnisse angelegt, KEINE Samba-Shares konfiguriert.
-# Samba-Freigaben werden getrennt mit dem eigenen Samba-Verwaltungstool gepflegt.
-# Vorhandene Ordner werden weder geloescht noch rekursiv uebernommen.
+log "Lokale Scanordner mit vererbbaren Zugriffsrechten vorbereiten"
+# Nur lokale Ordner; SMB-Freigaben verwaltet das eigene Samba-Tool.
+# Bestehende Eigentumsverhaeltnisse bleiben erhalten.
 SCAN_BASE=/srv/samba-shares
 install -d -m 755 "$SCAN_BASE"
 for folder in Scan-Eingang Scan-Ausgang; do
@@ -47,10 +46,27 @@ for folder in Scan-Eingang Scan-Ausgang; do
   if [[ ! -d "$scan_path" ]]; then
     install -d -o stirling -g stirling -m 2770 "$scan_path"
   fi
-  # ACL erlaubt Stirling Zugriff auch wenn die Freigabe spaeter
-  # z.B. markus:markus gehoert. Default-ACL fuer neue Dateien/Ordner.
-  setfacl -m u:stirling:rwx "$scan_path"
-  setfacl -m d:u:stirling:rwx "$scan_path"
+
+  # ACL-Zugriff fuer stirling; falls vorhanden auch markus.
+  acl_users=(stirling)
+  if id markus >/dev/null 2>&1; then
+    acl_users+=(markus)
+  fi
+  for account in "${acl_users[@]}"; do
+    setfacl -m "u:${account}:rwx" "$scan_path"
+    setfacl -m "d:u:${account}:rwx" "$scan_path"
+  done
+
+  # Die effektive ACL-Maske darf die Rechte nicht einschraenken.
+  setfacl -m m::rwx "$scan_path"
+  setfacl -m d:m::rwx "$scan_path"
+
+  # Testen mit dem echten Stirling-Benutzer; Testdatei wieder entfernen.
+  runuser -u stirling -- test -r "$scan_path" || die "Kein Lesezugriff fuer stirling: $scan_path"
+  runuser -u stirling -- test -x "$scan_path" || die "Kein Verzeichniszugriff fuer stirling: $scan_path"
+  test_file="$scan_path/.stirling-install-write-test-$$"
+  runuser -u stirling -- touch "$test_file" || die "Kein Schreibzugriff fuer stirling: $scan_path"
+  runuser -u stirling -- rm -f "$test_file" || die "Testdatei konnte nicht entfernt werden: $test_file"
 done
 
 log "Stirling PDF herunterladen"
