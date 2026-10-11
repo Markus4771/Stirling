@@ -56,7 +56,7 @@ EOF
   chmod 600 "$INSTALL_DIR/.env"
 fi
 
-log "systemd-Dienst anlegen"
+log "Verzeichnisberechtigungen sicherstellen"\nchown -R stirling:stirling "$INSTALL_DIR"\nchmod 750 "$INSTALL_DIR"\nchmod -R u+rwX "$INSTALL_DIR/pipeline"\n\nlog "systemd-Dienst anlegen"
 cat > "$SERVICE" <<'EOF'
 [Unit]
 Description=Stirling PDF (JAR)
