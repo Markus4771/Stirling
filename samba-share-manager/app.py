@@ -54,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
             <input type="hidden" name="preset" value="{'input' if '/pipeline/watchedFolders/' in path else 'output' if '/pipeline/finishedFolders/' in path else 'general'}">
             <select name="writable"><option value="yes" {'selected' if share.get('writable') else ''}>Schreiben erlaubt</option>
             <option value="no" {'selected' if not share.get('writable') else ''}>Nur lesen</option></select>
-            <button type="submit">Speichern</button></form>
+            <button type="submit">Speichern</button></form><form method="post" action="/set-path"><input type="hidden" name="name" value="{name}"><label>Zielpfad ändern</label><input name="path" value="{path}" required style="width:95%;box-sizing:border-box"><button type="submit">Pfad übernehmen</button></form>
             <form method="post" action="/delete"><input type="hidden" name="name" value="{name}"><button class="danger" type="submit">Entfernen</button></form></td></tr>'''
         status=('<p class="'+('err' if is_error else 'ok')+'">'+html.escape(message)+'</p>') if message else ''
         if not data.get('ok'):status='<p class="err">'+html.escape(data.get('error','Fehler'))+'</p>'
@@ -67,7 +67,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if not self.guard():return
-        if self.path not in ('/create','/update','/delete'):
+        if self.path not in ('/create','/update','/delete','/set-path'):
             self.respond(404,'<main>Nicht gefunden</main>');return
         origin=self.headers.get('Origin')
         expected=f'http://{self.headers.get("Host","")}'
@@ -78,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
             if not (0<length<1024):raise ValueError()
             form=parse_qs(self.rfile.read(length).decode())
             name=form.get('name',[''])[0]
-            result=helper(self.path[1:],name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]) if self.path!='/delete' else helper('delete',name)
+            result=(helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('delete',name) if self.path=='/delete' else helper(self.path[1:],name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
             self.page(result.get('message',result.get('error','Fehler')),not result.get('ok'))
         except (ValueError,UnicodeError):self.respond(400,'<main>Ungueltige Anfrage</main>')
 
