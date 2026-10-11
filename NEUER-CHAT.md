@@ -70,6 +70,40 @@ Die native QR-Code-Funktion wurde im **separaten Testsystem** auf Stirling PDF v
 3. Ordnerzugriff/ACL-Vererbung und Samba-Konfiguration dokumentieren, damit Rechte für neue Dateien zuverlässig bleiben.
 4. Native QR-Trennung mit echten Scanner-PDFs (schief, gedreht, unscharf), weiteren QR-Inhalten und dem Processor testen.
 5. Alte nicht genutzte Watched-Folder-Struktur erst nach Prüfung bereinigen; keine produktiven Dateien löschen.
-6. Backup der Konfiguration, Samba-Konfiguration und systemd-Service.\n7. Navigation/Untermenü unter Testbedingungen prüfen, dann Deploy- und Rollback-Plan erstellen.
+6. Backup der Konfiguration, Samba-Konfiguration und systemd-Service.
+7. Navigation/Untermenü unter Testbedingungen prüfen, dann Deploy- und Rollback-Plan erstellen.
 
 Weitere Installationsdetails: [README.md](README.md).
+
+## Vorbereitung Produktivbetrieb (12.10.2026)
+
+**Status: Planung, kein Deployment.** Vor dem Austausch der produktiven JAR den Dienstpfad, die tatsächliche Version und ein vollständiges Backup prüfen. Das einzige bestätigte End-to-End-Ergebnis ist bislang der manuelle digitale QR-Test. Ungeprüft sind Scanner-PDFs und Automation.
+
+### Nichtinvasive Bestandsaufnahme
+
+```bash
+sudo systemctl cat stirlingpdf.service
+sudo systemctl status stirlingpdf.service --no-pager
+ls -lh /opt/Stirling-PDF/Stirling-PDF-with-login.jar ~/stirling-qr-gui-src/app/core/build/libs/stirling-pdf-3.1.0.jar
+sha256sum /opt/Stirling-PDF/Stirling-PDF-with-login.jar ~/stirling-qr-gui-src/app/core/build/libs/stirling-pdf-3.1.0.jar
+```
+
+### Sicherungsumfang
+
+- Original-JAR unter `/opt/Stirling-PDF/Stirling-PDF-with-login.jar`
+- Konfiguration `/opt/Stirling-PDF/configs` und `.env` (Zugangsdaten geschützt behandeln)
+- `/opt/Stirling-PDF/pipeline`, ggf. `/opt/Stirling-PDF/customFiles`
+- `/etc/systemd/system/stirlingpdf.service`
+- Datenbank und anwendungsspezifische Daten nach Prüfung ihrer tatsächlichen Verzeichnisse und des Sicherungsverfahrens
+- Samba-Konfiguration (separat); keine Scandateien überschreiben
+
+### Rollout-Vorgehen, erst nach Freigabe
+
+1. Laufende automatisierte Verarbeitung anhalten und konsistentes Backup verifizieren.
+2. Alte JAR als unveränderbare Rückfallversion sichern; prüfbare Hashes dokumentieren.
+3. Test-JAR in Staging unter dem endgültigen Benutzer und **mit einer Kopie**, nicht dem produktiven Datenverzeichnis testen.
+4. Wartungsfenster: Dienst stoppen, JAR atomar austauschen, Eigentümer/Rechte prüfen, Dienst starten.
+5. API, Login, UI, bestehende OCR-/Ordner-Automatisierung und native QR-Trennung verifizieren.
+6. Bei Fehlfunktion Dienst stoppen, Original-JAR wiederherstellen und zurückstarten; Konfigurations-/Datenbankmigrationen gesondert betrachten.
+
+**Kein automatischer Austausch der JAR:** Die produktive und die selbst gebaute v3.1.0-Version müssen hinsichtlich Konfiguration, Datenbank und Funktionen kompatibel sein.
