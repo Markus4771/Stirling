@@ -34,3 +34,17 @@ Mit `qrMode=prefix`, `qrValue=SCAN:` und `keepQrPage=true` soll eine Test-PDF mi
 - Die bestehende JAR auf `scanner` ist **unverändert**.
 - Die schon bestehende separate Python-QR-Erweiterung unter `qr-splitter/` ist unabhängig vom geplanten nativen Stirling-PDF-Patch.
 - Erst nach vollständigem Build und Test darf die bestehende JAR mit Backup ersetzt werden.
+
+## Quellcode-Checkout für Version 3.1.0
+
+Zur isolierten Vorbereitung wurde `patches/prepare-qr-gui.sh` ergänzt:
+
+```bash
+git clone https://github.com/Markus4771/Stirling.git
+cd Stirling
+bash patches/prepare-qr-gui.sh
+```
+
+Es klont den offiziellen Tag `v3.1.0` in ein separates Verzeichnis, prüft den Patch mit `git apply --check` und wendet ihn nur bei erfolgreicher Prüfung an. Das Skript verändert **nicht** die produktive Stirling-PDF-JAR oder die Samba-Ordner.
+
+**Status:** Tag `v3.1.0` wurde über die GitHub-Quellcodeansicht geprüft. Ein tatsächlicher `git apply`-, Java- oder Frontend-Build konnte in dieser Umgebung mangels GitHub-Netzwerkzugriff nicht ausgeführt werden. Der Patch ist weiterhin experimentell.
