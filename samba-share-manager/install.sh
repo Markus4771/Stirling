@@ -53,7 +53,7 @@ NoNewPrivileges=no
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=/run
+ReadWritePaths=/run /srv /etc/samba
 Environment=SHARE_GUI_HOST=0.0.0.0
 Environment=SHARE_GUI_PORT=8765
 [Install]
