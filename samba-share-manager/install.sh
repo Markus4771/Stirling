@@ -2,6 +2,8 @@
 set -euo pipefail
 if [[ $EUID -ne 0 ]]; then echo 'Bitte mit sudo ausfuehren: sudo bash install.sh'; exit 1; fi
 for c in testparm systemctl python3 visudo; do command -v "$c" >/dev/null || { echo "Fehlt: $c (Samba und sudo zuerst installieren)"; exit 1; }; done
+test -d /opt/Stirling-PDF/pipeline/watchedFolders && test -d /opt/Stirling-PDF/pipeline/finishedFolders || { echo 'Stirling-PDF-Pipeline-Verzeichnisse fehlen'; exit 1; }
+id stirling >/dev/null || { echo 'Stirling-Benutzer fehlt'; exit 1; }
 id markus >/dev/null || { echo 'Linux-Benutzer markus fehlt.'; exit 1; }
 pdbedit -L 2>/dev/null | grep -q '^markus:' || { echo 'Samba-Benutzer markus fehlt: sudo smbpasswd -a markus'; exit 1; }
 read -r -s -p 'Neues GUI-Passwort fuer Benutzer admin: ' PASS; echo
@@ -53,14 +55,15 @@ NoNewPrivileges=no
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=/run /srv /etc/samba
+ReadWritePaths=/run /srv /etc/samba /opt/Stirling-PDF/pipeline
 Environment=SHARE_GUI_HOST=0.0.0.0
 Environment=SHARE_GUI_PORT=8765
 [Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable --now samba-share-manager.service
+systemctl enable samba-share-manager.service
+systemctl restart samba-share-manager.service
 systemctl reload smbd
 echo 'Fertig. Browser: http://SERVER-IP:8765/  Login: admin'
 echo 'Sicherheitsinfo: nur im vertrauenswuerdigen LAN verwenden; fuer Fernzugriff HTTPS via Reverse Proxy.'
