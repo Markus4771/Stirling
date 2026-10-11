@@ -53,15 +53,36 @@ def put(entries):
 
 def main():
     if os.geteuid()!=0: fail('Root-Berechtigung erforderlich')
-    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update'): fail('Ungueltige Aktion')
+    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path'): fail('Ungueltige Aktion')
     action=sys.argv[1]
     entries=read_entries()
     if action=='list':
         if len(sys.argv)!=2: fail('Ungueltige Argumente')
         print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path',''), 'writable':v.get('read only','no')=='no'} for n,v in sorted(entries.items())]})); return
-    if (action in ('create','update') and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3): fail('Ungueltige Argumente')
+    if (action in ('create','update') and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3) or (action=='set-path' and len(sys.argv)!=4): fail('Ungueltige Argumente')
     name=sys.argv[2]
     if not NAME_RE.fullmatch(name): fail('Name: Buchstaben, Zahlen, _ oder -, maximal 40 Zeichen')
+    if action=='set-path':
+        if name not in entries: fail('Freigabe nicht gefunden')
+        supplied=sys.argv[3]
+        target=Path(supplied)
+        roots=(BASE, PIPELINE/'watchedFolders', PIPELINE/'finishedFolders')
+        if not target.is_absolute() or '..' in target.parts or '.' in target.parts:
+            fail('Ungueltiger Pfad')
+        if not any(root in target.parents for root in roots):
+            fail('Pfad ausserhalb der erlaubten Scanverzeichnisse')
+        if not target.is_dir() or target.is_symlink() or target.resolve(strict=True)!=target:
+            fail('Pfad muss ein existierendes Verzeichnis ohne Symlinks sein')
+        relative=next(target.relative_to(root) for root in roots if root in target.parents)
+        if any(p.startswith('.') or p in ('processing','error') for p in relative.parts):
+            fail('Interne Ordner duerfen nicht freigegeben werden')
+        import pwd
+        owner=pwd.getpwnam('stirling' if PIPELINE in target.parents else 'markus')
+        entries[name]['path']=str(target)
+        entries[name]['force user']=owner.pw_name
+        put(entries)
+        print(json.dumps({'ok':True,'message':'Zielpfad geaendert; Dateien nicht verschoben','path':str(target)}))
+        return
     if action in ('create','update'):
         preset=sys.argv[3]
         if preset not in PRESETS: fail('Ungueltiger Ordnertyp')
