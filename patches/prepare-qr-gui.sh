@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Safe local preparation of Stirling PDF v3.1.0 QR-GUI source.
-# Does not touch /opt/Stirling-PDF or running services.
+# Prepare native QR GUI in an isolated Stirling PDF v3.1.0 checkout.
+# Does not touch the live JAR, SMB shares or systemd services.
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHECKOUT="${1:-$HOME/stirling-qr-gui-src}"
-[[ ! -e "$CHECKOUT" ]] || { echo "Target already exists: $CHECKOUT" >&2; exit 1; }
 command -v git >/dev/null || { echo "git missing" >&2; exit 1; }
-git clone --branch v3.1.0 --depth 1 https://github.com/Stirling-Tools/Stirling-PDF.git "$CHECKOUT"
+command -v python3 >/dev/null || { echo "python3 missing" >&2; exit 1; }
+if [[ ! -e "$CHECKOUT" ]]; then
+  git clone --branch v3.1.0 --depth 1 https://github.com/Stirling-Tools/Stirling-PDF.git "$CHECKOUT"
+fi
+[[ -d "$CHECKOUT/.git" ]] || { echo "Not a Git checkout: $CHECKOUT" >&2; exit 1; }
 cd "$CHECKOUT"
-git apply --check "$ROOT/patches/qr-gui-v1.patch"
-git apply "$ROOT/patches/qr-gui-v1.patch"
-python3 "$ROOT/patches/fix-generated-api.py" "$CHECKOUT"
-echo "Patch applied to $CHECKOUT."
-echo "Next: regenerate tool API types (task frontend:tool-models), run checks and build."
-echo "Do not deploy until backend/frontend compilation and integration tests pass."
+[[ "$(git status --porcelain)" == "" ]] || { echo "Checkout contains local changes; stop to protect them." >&2; exit 1; }
+[[ "$(git rev-parse HEAD)" == "$(git rev-list -n 1 v3.1.0)" ]] || { echo "Checkout is not v3.1.0" >&2; exit 1; }
+python3 "$ROOT/patches/apply-qr-gui-v3.1.0.py" "$CHECKOUT"
+echo "Source changes prepared. Build and functional testing still required."
