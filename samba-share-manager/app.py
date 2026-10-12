@@ -63,7 +63,7 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(401,'<main><h1>Anmeldung erforderlich</h1></main>',True);return False
         return True
 
-    def page(self,message='',is_error=False):
+    def page(self,message='',is_error=False,revealed=None):
         data=helper('list')
         rows=''
         for share in data.get('shares',[]):
@@ -73,7 +73,10 @@ class Handler(BaseHTTPRequestHandler):
             preset=share.get('preset','general')
             options=''.join('<option value="'+v+'"'+(' selected' if preset==v else '')+'>'+t+'</option>' for v,t in [('general','Allgemein'),('input','Stirling Eingang'),('output','Stirling Ausgang'),('paperless','Paperless Consume')])
             status='Passwort gesetzt · nicht auslesbar' if share.get('password_set') else 'Noch keine Anmeldedaten'
+            shown = revealed is not None and revealed[0]==share['name']
+            password_view = ('<input type="text" readonly value="'+html.escape(revealed[1],quote=True)+'" aria-label="Angezeigtes SMB-Passwort">' if shown else '<span class="muted">••••••••</span>')
             rows+=f'''<section class="share"><div class="share-head"><div><h3>{name}</h3><div class="path">{path}</div><div class="muted">SMB-Benutzer: <strong>{login or '–'}</strong> · {status}</div></div><span class="tag">Aktiv</span></div>
+            <div class="inline actions"><form method="post" action="/reveal" class="inline"><input type="hidden" name="name" value="{name}"><button type="submit" class="secondary" title="Passwort anzeigen">◉ Passwort anzeigen</button></form><div>{password_view}</div></div>
             <form method="post" action="/credentials"><input type="hidden" name="name" value="{name}"><div class="credentials"><div><label>SMB-Benutzer</label><input name="user" value="{login if login.startswith("share_") else "share_"+name.lower().replace("-","_")}" pattern="share_[a-z][a-z0-9_]{{1,24}}" required autocomplete="off"></div><div><label>Neues SMB-Passwort (mind. 12 Zeichen)</label><input type="password" name="password" minlength="12" required autocomplete="new-password"></div><button type="submit">Zugang speichern</button></div></form>
             <form method="post" action="/update" class="inline actions"><input type="hidden" name="name" value="{name}"><input type="hidden" name="preset" value="{preset}">
             <select name="writable" style="width:auto"><option value="yes" {'selected' if share.get('writable') else ''}>Lesen und Schreiben</option><option value="no" {'selected' if not share.get('writable') else ''}>Nur lesen</option></select><button class="secondary">Rechte speichern</button></form>
@@ -98,7 +101,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if not self.guard():return
-        if self.path not in ('/create','/update','/delete','/set-path','/credentials'):
+        if self.path not in ('/create','/update','/delete','/set-path','/credentials','/reveal'):
             self.respond(404,'<main>Nicht gefunden</main>');return
         origin=self.headers.get('Origin')
         expected=f'http://{self.headers.get("Host","")}'
@@ -109,6 +112,13 @@ class Handler(BaseHTTPRequestHandler):
             if not (0<length<4096):raise ValueError()
             form=parse_qs(self.rfile.read(length).decode())
             name=form.get('name',[''])[0]
+            if self.path=='/reveal':
+                result=helper('reveal',name)
+                if result.get('ok'):
+                    self.page('Passwort nur auf dieser Ansicht sichtbar; Browserfenster nach Nutzung schließen.',revealed=(name,result['password']))
+                else:
+                    self.page(result.get('error','Passwort nicht verfügbar'),True)
+                return
             result=(helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('credentials',name,form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/credentials' else helper('delete',name) if self.path=='/delete' else helper(self.path[1:],name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
             self.page(result.get('message',result.get('error','Fehler')),not result.get('ok'))
         except (ValueError,UnicodeError):self.respond(400,'<main>Ungueltige Anfrage</main>')
