@@ -15,6 +15,12 @@ else
   }
 fi
 for tool in task node npm java; do command -v "$tool" >/dev/null || { echo "Missing dependency: $tool" >&2; exit 1; }; done
+NPM_MAJOR="$(npm --version | cut -d. -f1)"
+if [[ ! "$NPM_MAJOR" =~ ^[0-9]+$ ]] || (( NPM_MAJOR < 11 )); then
+  echo "npm >=11 required for Stirling v3.1.0 frontend dependency aliases (found: $(npm --version))." >&2
+  echo "With compatible Node.js 20.19+: npm install -g npm@11.21.0" >&2
+  exit 1
+fi
 cd "$CHECKOUT"
 ./gradlew :stirling-pdf:bootJar \
   -PbuildWithFrontend=true \
