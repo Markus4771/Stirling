@@ -21,7 +21,11 @@ else
   [[ -f "$TARGET" && -f "$UNIT" ]] || { echo "No existing Stirling installation to upgrade." >&2; exit 1; }
 fi
 id stirling >/dev/null 2>&1 || useradd --system --home-dir "$BASE" --shell /usr/sbin/nologin stirling
-mkdir -p "$BASE" "$BACKUPS"
+mkdir -p "$BACKUPS"
+if [[ "$MODE" == --fresh ]]; then
+  install -d -o stirling -g stirling -m 0750 "$BASE"
+  install -d -o stirling -g stirling -m 0750 "$BASE/logs"
+fi
 STAGED="$(mktemp "$BASE/.stirling-new.XXXXXXXX.jar")"
 trap 'rm -f "$STAGED"' EXIT
 install -o stirling -g stirling -m 0640 "$SOURCE" "$STAGED"
@@ -40,6 +44,7 @@ if [[ "$MODE" == --upgrade ]]; then
 else
   install -d -o stirling -g stirling -m 0750 "$BASE/configs"
   install -d -o stirling -g stirling -m 0750 "$BASE/pipeline"
+  install -d -o stirling -g stirling -m 0750 "$BASE/customFiles"
   cat > "$BASE/.env" <<'ENV'
 SYSTEM_DEFAULTLOCALE=de-DE
 SERVER_ADDRESS=0.0.0.0
