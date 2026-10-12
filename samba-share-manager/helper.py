@@ -169,7 +169,22 @@ def main():
         # Do not change ownership of an existing folder. Pipeline directories
         # are created only if absent and are never removed by this application.
         if action=='create' and directory.exists():
-            fail('Zielordner existiert bereits; keine automatische Uebernahme')
+            # Reuse a known local folder only if it is a real directory,
+            # not already assigned to another share and its existing owner
+            # can read/write it. Never chmod/chown/delete existing files.
+            if directory.is_symlink() or not directory.is_dir() or directory.resolve()!=directory:
+                fail('Vorhandener Zielordner ist kein sicheres lokales Verzeichnis')
+            if any(Path(v.get('path',''))==directory for v in entries.values()):
+                fail('Zielordner wird bereits von einer anderen Freigabe benutzt')
+            import stat
+            details=directory.stat()
+            if details.st_uid not in (user.pw_uid, stirling.pw_uid):
+                fail('Vorhandener Ordner gehoert weder markus noch stirling; keine automatische Uebernahme')
+            owner = user if details.st_uid==user.pw_uid else stirling
+            need='-w' if writable=='yes' else '-r'
+            check=subprocess.run(['runuser','-u',owner.pw_name,'--','test',need,str(directory)],capture_output=True)
+            if check.returncode:
+                fail('Vorhandener Zielordner ist fuer '+owner.pw_name+' nicht ausreichend berechtigt')
         if action=='update' and entries[name].get('path')!=str(directory):
             fail('Pfadwechsel bestehender Freigaben nicht erlaubt: erst Freigabe entfernen, dann neu erstellen')
         if not directory.exists():
