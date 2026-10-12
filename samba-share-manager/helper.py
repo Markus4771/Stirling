@@ -154,7 +154,7 @@ def main():
         if writable not in ('yes','no'): fail('Ungueltige Berechtigung')
         if action=='create' and any(n.casefold()==name.casefold() for n in entries): fail('Freigabe existiert bereits')
         if action=='update' and name not in entries: fail('Freigabe nicht gefunden')
-        if action=='create' and re.search(r'^\s*\['+re.escape(name)+r'\]\s*,re.I|re.M): fail('Name in smb.conf bereits vergeben')
+        if action=='create' and re.search(r'^\s*\['+re.escape(name)+r'\]\s*$',SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
         import pwd
         try:
             user=pwd.getpwnam('markus')
