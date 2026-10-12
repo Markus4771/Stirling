@@ -1,5 +1,7 @@
 # Stirling PDF – Installation und Scanserver
 
+> **Neu:** Für reproduzierbaren QR-Build, Neuinstallation, Updates und Rückfall siehe [INSTALLATION.md](INSTALLATION.md). Installationsskripte unter [scripts/](scripts/). Die bestehende produktive Instanz muss dafür nicht erneut installiert werden.
+
 Dokumentation für den Server `scanner` auf **Debian 13.7**, ohne Docker. Dieses Repository dokumentiert die Installation von Stirling PDF als geplanten Ersatz für ScanPro; es enthält nicht die Stirling-PDF-Quellsoftware.
 
 ## Bestätigter Ist-Stand (12.10.2026)
