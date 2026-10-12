@@ -2,14 +2,15 @@
 
 Dokumentation für den Server `scanner` auf **Debian 13.7**, ohne Docker. Dieses Repository dokumentiert die Installation von Stirling PDF als geplanten Ersatz für ScanPro; es enthält nicht die Stirling-PDF-Quellsoftware.
 
-## Bestätigter Ist-Stand (11.10.2026)
+## Bestätigter Ist-Stand (12.10.2026)
 
 - OpenJDK 25.0.4.1
 - Stirling PDF unter `/opt/Stirling-PDF`
 - systemd-Dienst `stirlingpdf` läuft und startet automatisch
 - Weboberfläche funktioniert auf `http://SERVER-IP:8080`
 - Samba-Freigaben `Scan-Eingang` und `Scan-Ausgang` sind vorhanden; lokale Lese- und Schreibtests als Benutzer `stirling` waren erfolgreich.
-- Grafische Automatisierung `Test`: Scan-Eingang → OCR & Scans bereinigen → Scan-Ausgang; nach Konfigurationsanpassung meldet der Anwender, dass es scheinbar funktioniert. Ein nachgewiesener End-to-End-Test der resultierenden PDF steht noch aus.
+- Grafische Automatisierung `Test`: Scan-Eingang → OCR & Scans bereinigen → Scan-Ausgang; nach Konfigurationsanpassung funktionierte die Verarbeitung nach Anwenderangabe. Ein erneuter End-to-End-Test **nach dem JAR-Austausch** ist noch sinnvoll.
+- **Produktiver QR-Code-Fix (12.10.2026):** Login, PDF-Aufteilen und native QR-Code-Trennung auf Port `8080` erfolgreich vom Anwender getestet; vier Dateien aus der 10-seitigen Test-PDF korrekt erzeugt.
 
 ## 1. Debian vorbereiten
 
@@ -244,9 +245,9 @@ Bei Bedarf die Automatisierung `Test` in der Weboberfläche speichern und mit ei
 | Scan-Optimierung | PDF-Komprimierung |
 | Scan-Ausgang | Ergebnisablage über lokalen Ordner/Samba |
 
-## 8. Native QR-Trennung: erfolgreicher Test (12.10.2026)
+## 8. Native QR-Trennung: erfolgreicher Test und Produktivbetrieb (12.10.2026)
 
-Die selbst entwickelte GUI-Erweiterung für den offiziellen Stirling-PDF-Quellstand `v3.1.0` wurde isoliert gebaut und funktional getestet. Die produktive Instanz auf Port 8080 ist **nicht verändert**.
+Die selbst entwickelte GUI-Erweiterung für den offiziellen Stirling-PDF-Quellstand `v3.1.0` wurde isoliert gebaut, anschließend mit vollständigem Frontend korrigiert und am 12.10.2026 erfolgreich auf Port `8080` produktiv getestet.
 
 - Quellcheckout: `/home/markus/stirling-qr-gui-src`
 - Patch im Projekt: `patches/apply-qr-gui-v3.1.0.py`; Vorbereitung über `patches/prepare-qr-gui.sh`
@@ -264,9 +265,25 @@ java -Djava.io.tmpdir="$HOME/stirling-qr-test/tmp" \
 
 **Nachgewiesener manueller Test:** 10-seitige PDF, QR-Wert `SCAN:TEST` auf den Originalseiten 2, 5 und 7; in der GUI „Nach Seitenteiler“, „Exakter Inhalt“, `SCAN:TEST`, „QR-Code-Seite behalten“ aktiviert, Duplex deaktiviert. Vier PDFs erstellt: Originalseiten **1**, **2–4**, **5–6**, **7–10**. Der Nutzer bestätigte das Ergebnis per Screenshot; QR-Codes sind in den geteilten Dateien sichtbar.
 
-**Bekannte Einschränkung:** Das Menü „Aufteilen“ erschien zeitweise nur kurz. Die Werkzeugseite ließ sich nach erneuter Erreichbarkeit der Testinstanz direkt über `/split` öffnen. Der Navigationsfehler ist **nicht abschließend reproduziert oder behoben**. Bei unerreichbarer Testinstanz lieferte `curl` HTTP `000`; nach Neustart waren `/split` und `/api/v1/config/endpoints-availability` beide mit HTTP `200` erreichbar.
+**Login-/Split-Fehler behoben:** Der zunächst verwendete Build mit `-PfrontendMode=core -PbuildWithPortal=false` zeigte bei aktivierter Anmeldung weder die korrekte Login-Seite noch eine zuverlässig nutzbare Split-Oberfläche (401-Weiterleitungen). Mit `-PfrontendMode=proprietary -PbuildWithPortal=true` funktionieren Anmeldung und Split sowohl isoliert auf Port `8082` als auch produktiv auf `8080` (Anwenderbestätigung). Der vollständige Frontend-Build benötigt den externen `task`-Befehl von go-task.
 
-**Noch nicht geprüft:** QR-Erkennung bei echten Scans, gedrehten und schiefen Seiten, schlechten Druckvorlagen, Duplexbetrieb, leeren Seiten und anderen QR-Inhalten; Integration in die automatische Ordnerverarbeitung; Sicherheits- und Regressionstests; belastbares Deployment samt Rollback. Das erfolgreiche GUI-Beispiel ist **keine** Produktionsfreigabe.
+**Noch nicht geprüft:** QR-Erkennung bei echten Scans, gedrehten und schiefen Seiten, schlechten Druckvorlagen, Duplexbetrieb, leeren Seiten und anderen QR-Inhalten; Integration in die automatische Ordnerverarbeitung und umfassende Regressionstests. Der manuelle produktive QR-Test ersetzt keinen End-to-End-Test des Processors.
+
+### Build der produktiven Erweiterung
+
+```bash
+cd ~/stirling-qr-gui-src
+./gradlew :stirling-pdf:bootJar \\
+  -PbuildWithFrontend=true \\
+  -PfrontendMode=proprietary \\
+  -PbuildWithPortal=true \\
+  --rerun-tasks \\
+  --no-daemon
+```
+
+Artefakt: `app/core/build/libs/stirling-pdf-3.1.0.jar`. Vor produktiven Änderungen auf der isolierten Instanz unter `/opt/Stirling-PDF-qr-test-isolated` (Port `127.0.0.1:8082`) mit Anmeldung testen. Die Original-JAR wurde unter `/root/stirling-backup/Stirling-PDF-with-login.jar` gesichert; die Sicherungen der produktiven Konfiguration und Datenbank sind separat zu behandeln.
+
+**Produktiver Abnahmetest am 12.10.2026:** QR-Wert `SCAN:TEST` auf Originalseiten 2, 5 und 7; QR-Seiten behalten, Duplex aus. Vier Ergebnisse mit 1, 3, 2 und 4 Seiten; Screenshot vom Anwender bestätigt. Weitere Einzelheiten und offene Tests stehen in [NEUER-CHAT.md](NEUER-CHAT.md).
 
 ## 9. Noch offen
 
@@ -276,8 +293,8 @@ java -Djava.io.tmpdir="$HOME/stirling-qr-test/tmp" \
 - [ ] Erfolgreichen End-to-End-Lauf von `Test` (inkl. Ausgabedatei, OCR und Originaldatei-Verhalten) dokumentieren
 - [x] Native QR-Code-Trennung mit digitaler Test-PDF auf Testinstanz prüfen (12.10.2026; vier korrekt getrennte PDFs)
 - [ ] QR-Code-Trennung mit echten gescannten Seiten und in der Automatisierung prüfen
-- [ ] Navigationsproblem des Aufteilen-Menüs reproduzieren bzw. beheben
-- [ ] Produktiven Rollout erst nach weiteren Tests und Backup/Rollback durchführen
+- [x] Navigationsproblem und Login-Fehler durch vollständigen Frontend-/Portal-Build beheben (12.10.2026)
+- [x] Produktive JAR mit Login und QR-Trennung auf Port `8080` umstellen; Anwender bestätigte erfolgreichen Test (12.10.2026)
 - [ ] Erst nach erfolgreichem Test ScanPro abschalten
 - [ ] Backup: `/opt/Stirling-PDF/configs`, Pipeline-Dateien, `.env`, systemd-Service, Samba-Konfiguration
 
