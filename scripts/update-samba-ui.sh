@@ -5,6 +5,8 @@ set -Eeuo pipefail
 [[ $EUID -eq 0 ]] || { echo "Als root ausführen" >&2; exit 1; }
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [[ -f /etc/systemd/system/samba-share-manager.service ]] || { echo "Samba Share Manager ist noch nicht installiert. Zuerst: bash install.sh --samba-only" >&2; exit 1; }
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y python3-cryptography
 install -d -o root -g root -m 0755 /usr/local/lib/samba-share-manager
 install -o root -g root -m 0755 "$ROOT/samba-share-manager/app.py" /usr/local/lib/samba-share-manager/app.py
 install -o root -g root -m 0755 "$ROOT/samba-share-manager/helper.py" /usr/local/lib/samba-share-manager/helper.py
