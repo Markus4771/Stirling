@@ -89,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
         <div class="cards"><section class="card"><h2>Neue Freigabe</h2><form method="post" action="/create"><label>Freigabename</label><input name="name" pattern="[a-zA-Z][a-zA-Z0-9_-]{{0,39}}" placeholder="z. B. Scan-Ausgang" required>
         <label>Ordner</label><select name="preset"><option value="general">Allgemein (/srv/samba-shares)</option><option value="input">Stirling PDF Eingang</option><option value="output">Stirling PDF Ausgang</option><option value="paperless">Paperless-Consume</option></select>
         <label>Schreibrechte</label><select name="writable"><option value="yes">Lesen und Schreiben</option><option value="no">Nur lesen</option></select>
-        <button type="submit">Freigabe erstellen</button></form><p class="muted">Anschließend unter „Vorhandene Freigaben“ den eigenen SMB-Benutzer und sein Passwort festlegen.</p>
+        <label>SMB-Benutzer</label><input name="user" placeholder="share_scan" pattern="share_[a-z][a-z0-9_]{1,24}" required autocomplete="off"><label>SMB-Passwort (mindestens 12 Zeichen)</label><input type="password" name="password" minlength="12" required autocomplete="new-password"><button type="submit">Freigabe erstellen</button></form><p class="muted">Freigabe und eigener SMB-Zugang werden zusammen angelegt. Anschließend kannst du den Zugang rechts bearbeiten.</p>
         <p class="muted">Paperless Consume muss denselben Ordner sehen (z. B. durch Einbinden der Freigabe). Nur die Freigabe zu erstellen löst noch keinen Import aus.</p></section>
         <section class="card"><h2>Vorhandene Freigaben ({len(data.get('shares',[]))})</h2>{rows or '<p class="muted">Noch keine Freigaben vorhanden.</p>'}</section></div>
         </main></div>''')
@@ -119,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self.page(result.get('error','Passwort nicht verfügbar'),True)
                 return
-            result=(helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('credentials',name,form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/credentials' else helper('delete',name) if self.path=='/delete' else helper(self.path[1:],name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
+            result=(helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('credentials',name,form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/credentials' else helper('delete',name) if self.path=='/delete' else helper('create',name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0],form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/create' else helper('update',name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
             self.page(result.get('message',result.get('error','Fehler')),not result.get('ok'))
         except (ValueError,UnicodeError):self.respond(400,'<main>Ungueltige Anfrage</main>')
 
