@@ -96,3 +96,9 @@ Auf einer Neuinstallation wird die aktuelle Oberfläche automatisch mit `bash in
 **Sicherheitsregeln:** Pro Freigabe ein eigenes `share_`-Konto, GUI nur in einem kontrollierten LAN oder per HTTPS und Zugangsschutz. Keine SMB-Passwörter in Git, Konfigurationsdateien oder Logs schreiben.
 
 **Teststatus:** Änderungen sind im Repository hinterlegt; noch kein vollständiger Integrationstest auf Debian 13 durchgeführt.
+
+## Passwortanzeige mit Augensymbol
+
+Bei bereits angemeldeten GUI-Administratoren zeigt die Schaltfläche **„◉ Passwort anzeigen“** das SMB-Passwort der ausgewählten Freigabe **ohne zweite Admin-Abfrage** an. Das Passwort ist nur in dieser Antwortansicht sichtbar; nach einem erneuten Laden wieder verdeckt. Neue SMB-Passwörter werden bei ihrer Vergabe zusätzlich verschlüsselt in `/etc/samba-share-manager/passwords.json` gesichert. Der lokale Schlüssel liegt in `/etc/samba-share-manager/vault.key`; beide Dateien haben Modus `0600` und sind nur für root lesbar. Der Share Manager nutzt dafür `python3-cryptography`.
+
+**Bestehende SMB-Passwörter kann Samba nicht zurückliefern.** Daher bei bereits vorhandenen Freigaben das Passwort einmal über „Zugang speichern“ neu vergeben. Die Anmeldung an der Weboberfläche muss geschützt erfolgen (HTTPS über vertrauenswürdigen Reverse Proxy oder nur kontrolliertes LAN). Administratoren der GUI können die SMB-Passwörter jetzt einsehen; den Zugriff entsprechend beschränken.
