@@ -107,6 +107,10 @@ def main():
         for share,entry in entries.items():
             if share!=name and entry.get('valid users')==login: fail('Samba-Benutzer bereits einer anderen Freigabe zugeordnet')
         password=sys.stdin.readline().rstrip('\n')
+        previous_login=entries[name].get('valid users','')
+        if not password:
+            if login==previous_login: fail('Zum Ändern des Passworts ein neues Passwort eingeben')
+            password=reveal_password(name)
         if len(password)<12 or len(password)>256: fail('Passwort muss 12 bis 256 Zeichen haben')
         import pwd
         try:
@@ -121,7 +125,8 @@ def main():
         entries[name]['valid users']=login
         put(entries)
         save_password(name,password)
-        print(json.dumps({'ok':True,'message':'Samba-Zugang gespeichert (Passwort wird nicht angezeigt)','user':login}))
+        message=('SMB-Benutzer geändert. Der bisherige Benutzer bleibt als Systemkonto bestehen.' if login!=previous_login else 'SMB-Passwort aktualisiert.')
+        print(json.dumps({'ok':True,'message':message,'user':login}))
         return
     if action=='set-path':
         if name not in entries: fail('Freigabe nicht gefunden')
