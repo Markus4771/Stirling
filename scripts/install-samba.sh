@@ -13,7 +13,7 @@ if [[ -e /etc/systemd/system/samba-share-manager.service ]]; then
 fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y samba smbclient sudo python3 acl
+apt-get install -y samba smbclient sudo python3 python3-cryptography acl
 id stirling >/dev/null || { echo "Systembenutzer stirling fehlt." >&2; exit 1; }
 # The bundled manager uses the SMB login 'markus'; create the account only if absent.
 if ! id markus >/dev/null 2>&1; then
