@@ -10,7 +10,7 @@ PORT=int(os.environ.get('SHARE_GUI_PORT','8765'))
 
 STYLE='''<style>
 :root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#292929;background:#f7f7f6}
-*{box-sizing:border-box}body{margin:0} .layout{display:grid;grid-template-columns:275px 1fr;min-height:100vh}
+*{box-sizing:border-box}body{margin:0} .layout{display:grid;grid-template-columns:minmax(0,1fr);min-height:100vh}
 aside{background:#fafafa;border-right:1px solid #e6e6e6;padding:22px 14px}
 .brand{font-size:24px;font-weight:750;padding:3px 13px 28px}.brand span{color:#a75551}
 .nav{padding:13px 16px;border-radius:8px;font-size:15px}.nav.active{background:#302f2d;color:white;font-weight:650}
@@ -84,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
             <form method="post" action="/delete" class="actions"><input type="hidden" name="name" value="{name}"><button class="danger">Freigabe entfernen</button></form></section>'''
         notice=('<div class="notice'+(' err' if is_error else '')+'">'+html.escape(message)+'</div>') if message else ''
         if not data.get('ok'):notice='<div class="notice err">'+html.escape(data.get('error','Fehler'))+'</div>'
-        self.respond(200,f'''<div class="layout"><aside><div class="brand"><span>◢</span> Stirling</div><div class="nav">PDF-Prozessor</div><div class="nav">Startseite</div><div class="nav active">Samba-Freigaben</div><div class="nav">Pipelines</div><div class="nav">Dokumente</div><div class="nav">Integrationen</div></aside>
+        self.respond(200,f'''<div class="layout">
         <main><header><div><h1>Samba-Freigaben</h1><p class="subtitle">Freigaben, Benutzer und Zugriffsrechte verwalten</p></div><span class="tag">Port {PORT}</span></header>{notice}
         <div class="cards"><section class="card"><h2>Neue Freigabe</h2><form method="post" action="/create"><label>Freigabename</label><input name="name" pattern="[a-zA-Z][a-zA-Z0-9_-]{{0,39}}" placeholder="z. B. Scan-Ausgang" required>
         <label>Ordner</label><select name="preset"><option value="general">Allgemein (/srv/samba-shares)</option><option value="input">Stirling PDF Eingang</option><option value="output">Stirling PDF Ausgang</option><option value="paperless">Paperless-Consume</option></select>
