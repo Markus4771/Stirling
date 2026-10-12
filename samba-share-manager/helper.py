@@ -97,7 +97,7 @@ def main():
     if action=='list':
         if len(sys.argv)!=2: fail('Ungueltige Argumente')
         print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path',''), 'writable':v.get('read only','no')=='no', 'user':v.get('valid users',''), 'password_set':n in password_vault(), 'preset': ('paperless' if v.get('comment','')=='Paperless Consume' else 'input' if '/watchedFolders/' in v.get('path','') else 'output' if '/finishedFolders/' in v.get('path','') else 'general')} for n,v in sorted(entries.items())]})); return
-    if (action in ('create','update') and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3) or (action=='set-path' and len(sys.argv)!=4) or (action=='credentials' and len(sys.argv)!=4): fail('Ungueltige Argumente')
+    if (action=='create' and len(sys.argv)!=6) or (action=='update' and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3) or (action=='set-path' and len(sys.argv)!=4) or (action=='credentials' and len(sys.argv)!=4): fail('Ungueltige Argumente')
     name=sys.argv[2]
     if not NAME_RE.fullmatch(name): fail('Name: Buchstaben, Zahlen, _ oder -, maximal 40 Zeichen')
     if action=='credentials':
@@ -157,6 +157,20 @@ def main():
         if preset not in PRESETS: fail('Ungueltiger Ordnertyp')
         writable=sys.argv[4]
         if writable not in ('yes','no'): fail('Ungueltige Berechtigung')
+        if action=='create':
+            login=sys.argv[5]
+            if not re.fullmatch(r'share_[a-z][a-z0-9_]{1,24}', login):
+                fail('SMB-Benutzer muss mit share_ beginnen (z. B. share_scan)')
+            password=sys.stdin.readline().rstrip('\\n')
+            if len(password)<12 or len(password)>256: fail('SMB-Passwort muss 12 bis 256 Zeichen haben')
+            if any(v.get('valid users')==login for v in entries.values()):
+                fail('SMB-Benutzer wird bereits für eine andere Freigabe verwendet')
+            import pwd
+            try:
+                pwd.getpwnam(login)
+                fail('Vorhandener Linux-Benutzer kann aus Sicherheitsgründen nicht übernommen werden')
+            except KeyError:
+                pass
         if action=='create' and any(n.casefold()==name.casefold() for n in entries): fail('Freigabe existiert bereits')
         if action=='update' and name not in entries: fail('Freigabe nicht gefunden')
         if action=='create' and re.search(r'^\s*\['+re.escape(name)+r'\]\s*$',SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
@@ -202,12 +216,18 @@ def main():
             os.chown(directory,owner.pw_uid,owner.pw_gid)
             os.chmod(directory,0o2770)
         if directory.is_symlink(): fail('Symbolische Links sind nicht erlaubt')
+        if action=='create':
+            result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
+            if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden: '+(result.stderr or result.stdout)[-350:])
+            result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\\n'+password+'\\n',capture_output=True,text=True,timeout=15)
+            if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
         entries[name]={'path':str(directory),'browseable':'yes','read only':'no' if writable=='yes' else 'yes',
-                       'valid users':(entries.get(name,{}).get('valid users','markus')),'force user':owner.pw_name,
+                       'valid users':(login if action=='create' else entries[name].get('valid users','markus')),'force user':owner.pw_name,
                        'comment':('Paperless Consume' if preset=='paperless' else 'Verwaltet durch Samba Share Manager'),
                        'create mask':'0660','directory mask':'2770'}
         put(entries)
-        print(json.dumps({'ok':True,'message':'Freigabe gespeichert','path':str(directory)}))
+        if action=='create': save_password(name,password)
+        print(json.dumps({'ok':True,'message':'Freigabe mit SMB-Benutzer gespeichert' if action=='create' else 'Freigabe aktualisiert','path':str(directory)}))
     else:
         if name not in entries: fail('Freigabe nicht gefunden')
         del entries[name]; put(entries)
