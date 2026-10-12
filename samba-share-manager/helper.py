@@ -161,7 +161,7 @@ def main():
             login=sys.argv[5]
             if not re.fullmatch(r'share_[a-z][a-z0-9_]{1,24}', login):
                 fail('SMB-Benutzer muss mit share_ beginnen (z. B. share_scan)')
-            password=sys.stdin.readline().rstrip('\\n')
+            password=sys.stdin.readline().rstrip('\n')
             if len(password)<12 or len(password)>256: fail('SMB-Passwort muss 12 bis 256 Zeichen haben')
             if any(v.get('valid users')==login for v in entries.values()):
                 fail('SMB-Benutzer wird bereits für eine andere Freigabe verwendet')
@@ -219,7 +219,7 @@ def main():
         if action=='create':
             result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
             if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden: '+(result.stderr or result.stdout)[-350:])
-            result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\\n'+password+'\\n',capture_output=True,text=True,timeout=15)
+            result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\n'+password+'\n',capture_output=True,text=True,timeout=15)
             if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
         entries[name]={'path':str(directory),'browseable':'yes','read only':'no' if writable=='yes' else 'yes',
                        'valid users':(login if action=='create' else entries[name].get('valid users','markus')),'force user':owner.pw_name,
