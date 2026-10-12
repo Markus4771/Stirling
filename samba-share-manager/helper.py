@@ -65,7 +65,7 @@ def main():
     if action=='credentials':
         if name not in entries: fail('Freigabe nicht gefunden')
         login=sys.argv[3]
-        if not re.fullmatch(r'[a-z][a-z0-9_]{2,30}',login): fail('Benutzer: 3-31 Kleinbuchstaben, Ziffern, _')
+        if not re.fullmatch(r'share_[a-z][a-z0-9_]{1,24}',login): fail('Benutzer muss mit share_ beginnen (z.B. share_scan), danach Kleinbuchstaben, Ziffern, _')
         for share,entry in entries.items():
             if share!=name and entry.get('valid users')==login: fail('Samba-Benutzer bereits einer anderen Freigabe zugeordnet')
         password=sys.stdin.readline().rstrip('\n')
@@ -77,7 +77,6 @@ def main():
             if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden')
         result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\n'+password+'\n',capture_output=True,text=True,timeout=15)
         if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
-        previous=entries[name].get('valid users','')
         entries[name]['valid users']=login
         put(entries)
         print(json.dumps({'ok':True,'message':'Samba-Zugang gespeichert (Passwort wird nicht angezeigt)','user':login}))
