@@ -9,12 +9,19 @@ die() { echo "FEHLER: $*" >&2; exit 1; }
 trap 'echo "Installation abgebrochen (Zeile $LINENO). Bestehende Installation nicht manuell löschen." >&2' ERR
 
 [[ "${EUID}" -eq 0 ]] || die "Als root starten: sudo bash install.sh --fresh"
-[[ $# -eq 1 && ( "$1" == "--fresh" || "$1" == "--upgrade" ) ]] || die "Aufruf: sudo bash install.sh --fresh|--upgrade"
+[[ $# -eq 1 && ( "$1" == "--fresh" || "$1" == "--upgrade" || "$1" == "--samba-only" ) ]] || die "Aufruf: sudo bash install.sh --fresh|--upgrade|--samba-only"
 MODE="$1"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . /etc/os-release
 [[ "${ID:-}" == "debian" && "${VERSION_ID%%.*}" == "13" ]] || die "Nur Debian 13 wird unterstützt."
 [[ "$(uname -m)" == "x86_64" ]] || die "Derzeit nur amd64 getestet."
+
+# Install only Samba Manager on an already functioning Stirling server.
+# Does not rebuild/replace Stirling or overwrite existing Processor configurations.
+if [[ "$MODE" == "--samba-only" ]]; then
+  bash "$ROOT/scripts/install-samba.sh"
+  exit 0
+fi
 
 # Strictly verify target before apt/package or build changes.
 if [[ "$MODE" == "--fresh" ]]; then
@@ -101,4 +108,6 @@ if (( READY == 0 )); then
 fi
 echo "HTTP antwortet: http://$(hostname -I | awk '{print $1}'):8080"
 echo "Anmeldung, QR-Split und Processor im Browser testen."
+log "Samba und eigene Share-Manager-Weboberfläche installieren"
+bash "$ROOT/scripts/install-samba.sh"
 echo "Das Skript richtet KEINE SMB-Freigaben und KEINE Automatisierungs-Pipelines ein."
