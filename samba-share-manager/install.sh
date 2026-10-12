@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+SHARE_GUI_PORT="${SHARE_GUI_PORT:-8085}"
+[[ "$SHARE_GUI_PORT" =~ ^[0-9]+$ ]] || { echo 'Ungueltiger Port'; exit 1; }
 if [[ $EUID -ne 0 ]]; then echo 'Bitte mit sudo ausfuehren: sudo bash install.sh'; exit 1; fi
 for c in testparm systemctl python3 visudo; do command -v "$c" >/dev/null || { echo "Fehlt: $c (Samba und sudo zuerst installieren)"; exit 1; }; done
 test -d /opt/Stirling-PDF/pipeline/watchedFolders && test -d /opt/Stirling-PDF/pipeline/finishedFolders || { echo 'Stirling-PDF-Pipeline-Verzeichnisse fehlen'; exit 1; }
@@ -41,7 +43,7 @@ samba-gui ALL=(root) NOPASSWD: /usr/local/lib/samba-share-manager/helper.py *
 EOF
 chmod 440 /etc/sudoers.d/samba-share-manager
 visudo -cf /etc/sudoers.d/samba-share-manager >/dev/null
-cat > /etc/systemd/system/samba-share-manager.service <<'EOF'
+cat > /etc/systemd/system/samba-share-manager.service <<EOF
 [Unit]
 Description=Simple Samba Share Manager
 After=network.target smbd.service
@@ -57,7 +59,7 @@ ProtectHome=yes
 PrivateTmp=yes
 ReadWritePaths=/run /srv /etc/samba /opt/Stirling-PDF/pipeline
 Environment=SHARE_GUI_HOST=0.0.0.0
-Environment=SHARE_GUI_PORT=8765
+Environment=SHARE_GUI_PORT=${SHARE_GUI_PORT}
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -65,5 +67,5 @@ systemctl daemon-reload
 systemctl enable samba-share-manager.service
 systemctl restart samba-share-manager.service
 systemctl reload smbd
-echo 'Fertig. Browser: http://SERVER-IP:8765/  Login: admin'
+echo 'Fertig. Browser: http://SERVER-IP:${SHARE_GUI_PORT}/  Login: admin'
 echo 'Sicherheitsinfo: nur im vertrauenswuerdigen LAN verwenden; fuer Fernzugriff HTTPS via Reverse Proxy.'
