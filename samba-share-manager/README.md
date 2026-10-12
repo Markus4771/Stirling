@@ -74,3 +74,25 @@ sudo systemctl status samba-share-manager --no-pager
 ```
 
 Die Verzeichnisse der Stirling-Pipelines verwenden intern den Systembenutzer `stirling` als SMB-Dateibesitzer; andere Manager-Shares den Benutzer `markus`. Vor produktivem Betrieb Zugriffsbeschränkungen, Netzwerk-Firewall und Schreib-/Leserechte testen.
+
+## Neue Oberfläche und Freigabezugänge (12.10.2026)
+
+- Optik im Stil der Stirling-PDF-Processor-Oberfläche; Verwaltungsoberfläche standardmäßig unter **http://SERVER-IP:8085/**.
+- Pro Freigabe dedizierter **Samba-Benutzer** mit Präfix `share_` und eigenem Passwort (mindestens 12 Zeichen); Zugangsdaten können nach Erstellen oder bei einer bestehenden Freigabe in der GUI gesetzt/geändert werden.
+- In der Freigabenübersicht wird der **Benutzername und Passwortstatus**, niemals das Passwort selbst angezeigt. Samba speichert lediglich den dafür vorgesehenen Kennwort-Hash; Klartext kann nicht zurückgelesen werden.
+- Neuer Freigabetyp **Paperless Consume (Ausgang)** mit Ziel `/srv/samba-shares/Paperless-Consume`. Der Paperless-Host muss diese Freigabe explizit in sein Consume-Verzeichnis mounten oder synchronisieren. Die Freigabe allein verbindet Paperless nicht automatisch.
+- Bestehende SMB-Freigaben werden beim GUI-Update nicht überschrieben.
+
+Auf einem bereits installierten System **ohne erneute Passwortvergabe für GUI-admin** aktualisieren:
+
+```bash
+cd /root/Stirling
+git pull
+bash scripts/update-samba-ui.sh
+```
+
+Auf einer Neuinstallation wird die aktuelle Oberfläche automatisch mit `bash install.sh --fresh` installiert.
+
+**Sicherheitsregeln:** Pro Freigabe ein eigenes `share_`-Konto, GUI nur in einem kontrollierten LAN oder per HTTPS und Zugangsschutz. Keine SMB-Passwörter in Git, Konfigurationsdateien oder Logs schreiben.
+
+**Teststatus:** Änderungen sind im Repository hinterlegt; noch kein vollständiger Integrationstest auf Debian 13 durchgeführt.
