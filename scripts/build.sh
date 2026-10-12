@@ -4,9 +4,9 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHECKOUT="${CHECKOUT:-$HOME/stirling-qr-gui-src}"
 if [[ ! -f "$CHECKOUT/gradlew" ]]; then
-  "$ROOT/patches/prepare-qr-gui.sh" "$CHECKOUT"
+  bash "$ROOT/patches/prepare-qr-gui.sh" "$CHECKOUT"
 elif [[ -z "$(git -C "$CHECKOUT" status --porcelain)" ]]; then
-  "$ROOT/patches/prepare-qr-gui.sh" "$CHECKOUT"
+  bash "$ROOT/patches/prepare-qr-gui.sh" "$CHECKOUT"
 else
   echo "Existing modified checkout: $CHECKOUT"
   echo "Assuming QR patch already applied; verifying required fields."
