@@ -115,7 +115,7 @@ def main():
                 fail('Bestehender Linux-Benutzer kann aus Sicherheitsgründen nicht übernommen werden')
         except KeyError:
             result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
-            if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden')
+            if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden: '+(result.stderr or result.stdout)[-350:])
         result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\n'+password+'\n',capture_output=True,text=True,timeout=15)
         if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
         entries[name]['valid users']=login
