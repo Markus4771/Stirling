@@ -149,3 +149,7 @@ JAR-Ausgabe: `app/core/build/libs/stirling-pdf-3.1.0.jar`. Die vorbereitenden QR
 2. Mit echten gescannten, gedrehten, schiefen, schwachen und Duplex-QR-Seiten testen.
 3. Separat prüfen, ob die native QR-Trennung in der grafischen Automatisierung/Processor eingebunden werden kann. Der GUI-Test belegt dies **nicht**.
 4. Rückfall-JAR, produktive Datenbank und Konfiguration regelmäßig sichern; funktionierenden Stand mit Build-Flags reproduzierbar halten.
+
+## Installierbarkeit des Projekts – 12.10.2026
+
+Im GitHub-Projekt wurden `scripts/build.sh` (Upstream v3.1.0 + QR-Patch, vollständiges Frontend), `scripts/install.sh` (`--fresh` und `--upgrade` mit Sicherung bei gestopptem Dienst), `scripts/rollback.sh` (nur JAR zurückrollen) sowie `INSTALLATION.md` ergänzt. Diese Skripte **sind noch nicht auf einer frischen Debian-13-Testinstallation ausgeführt worden**. Die bestehende produktive Instanz wurde nicht verändert. Vor allgemeiner Freigabe: Bash-Syntaxprüfung, Installations-/Rollback-Test auf frischem Host und Backup-Vollständigkeit prüfen.
