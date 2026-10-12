@@ -7,7 +7,7 @@ CONFIG = Path('/etc/samba/share-manager.conf')
 SMB_CONF = Path('/etc/samba/smb.conf')
 BASE = Path('/srv/samba-shares')
 PIPELINE = Path('/opt/Stirling-PDF/pipeline')
-PRESETS = {'general': None, 'input': 'watchedFolders', 'output': 'finishedFolders'}
+PRESETS = {'general': None, 'input': 'watchedFolders', 'output': 'finishedFolders', 'paperless': None}
 NAME_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9_-]{0,39}$')
 
 def fail(msg):
@@ -53,15 +53,35 @@ def put(entries):
 
 def main():
     if os.geteuid()!=0: fail('Root-Berechtigung erforderlich')
-    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path'): fail('Ungueltige Aktion')
+    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path','credentials'): fail('Ungueltige Aktion')
     action=sys.argv[1]
     entries=read_entries()
     if action=='list':
         if len(sys.argv)!=2: fail('Ungueltige Argumente')
-        print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path',''), 'writable':v.get('read only','no')=='no'} for n,v in sorted(entries.items())]})); return
-    if (action in ('create','update') and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3) or (action=='set-path' and len(sys.argv)!=4): fail('Ungueltige Argumente')
+        print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path',''), 'writable':v.get('read only','no')=='no', 'user':v.get('valid users',''), 'password_set':bool(v.get('valid users','')), 'preset': ('paperless' if v.get('comment','')=='Paperless Consume' else 'input' if '/watchedFolders/' in v.get('path','') else 'output' if '/finishedFolders/' in v.get('path','') else 'general')} for n,v in sorted(entries.items())]})); return
+    if (action in ('create','update') and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3) or (action=='set-path' and len(sys.argv)!=4) or (action=='credentials' and len(sys.argv)!=4): fail('Ungueltige Argumente')
     name=sys.argv[2]
     if not NAME_RE.fullmatch(name): fail('Name: Buchstaben, Zahlen, _ oder -, maximal 40 Zeichen')
+    if action=='credentials':
+        if name not in entries: fail('Freigabe nicht gefunden')
+        login=sys.argv[3]
+        if not re.fullmatch(r'[a-z][a-z0-9_]{2,30}',login): fail('Benutzer: 3-31 Kleinbuchstaben, Ziffern, _')
+        for share,entry in entries.items():
+            if share!=name and entry.get('valid users')==login: fail('Samba-Benutzer bereits einer anderen Freigabe zugeordnet')
+        password=sys.stdin.readline().rstrip('\\n')
+        if len(password)<12 or len(password)>256: fail('Passwort muss 12 bis 256 Zeichen haben')
+        import pwd
+        try: pwd.getpwnam(login)
+        except KeyError:
+            result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
+            if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden')
+        result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\\n'+password+'\\n',capture_output=True,text=True,timeout=15)
+        if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
+        previous=entries[name].get('valid users','')
+        entries[name]['valid users']=login
+        put(entries)
+        print(json.dumps({'ok':True,'message':'Samba-Zugang gespeichert (Passwort wird nicht angezeigt)','user':login}))
+        return
     if action=='set-path':
         if name not in entries: fail('Freigabe nicht gefunden')
         supplied=sys.argv[3]
@@ -99,8 +119,8 @@ def main():
             user=pwd.getpwnam('markus')
             stirling=pwd.getpwnam('stirling')
         except KeyError: fail('Linux-Benutzer markus oder stirling fehlt')
-        if preset=='general':
-            directory=BASE/name
+        if preset in ('general','paperless'):
+            directory=(BASE/'Paperless-Consume' if preset=='paperless' else BASE/name)
             owner=user
         else:
             directory=PIPELINE/PRESETS[preset]/name
@@ -113,7 +133,7 @@ def main():
             fail('Pfadwechsel bestehender Freigaben nicht erlaubt: erst Freigabe entfernen, dann neu erstellen')
         if not directory.exists():
             parent=directory.parent
-            if preset=='general':
+            if preset in ('general','paperless'):
                 BASE.mkdir(mode=0o755,parents=True,exist_ok=True)
             elif not parent.is_dir() or parent.is_symlink():
                 fail('Stirling-PDF-Zielverzeichnis existiert nicht')
@@ -122,7 +142,8 @@ def main():
             os.chmod(directory,0o2770)
         if directory.is_symlink(): fail('Symbolische Links sind nicht erlaubt')
         entries[name]={'path':str(directory),'browseable':'yes','read only':'no' if writable=='yes' else 'yes',
-                       'valid users':'markus','force user':owner.pw_name,
+                       'valid users':(entries.get(name,{}).get('valid users','markus')),'force user':owner.pw_name,
+                       'comment':('Paperless Consume' if preset=='paperless' else 'Verwaltet durch Samba Share Manager'),
                        'create mask':'0660','directory mask':'2770'}
         put(entries)
         print(json.dumps({'ok':True,'message':'Freigabe gespeichert','path':str(directory)}))
