@@ -102,3 +102,26 @@ Nur die vorherige JAR wird wiederhergestellt; **keine automatische Datenbankrüc
 - `scripts/install.sh` verändert **keine** Samba-Freigaben oder bestehenden Processor-Pipelines; diese sind installationsspezifisch.
 - QR-Erweiterung basiert auf einem Patch auf einen festgehaltenen Upstream-Tag; Updates auf eine neue Stirling-Version benötigen Patch-Anpassung und Regressionstests.
 - Skripte sind noch nicht durch ein automatisiertes Integrations-/CI-Testverfahren validiert.
+
+## Samba-Verwaltungsoberfläche (ab 12.10.2026)
+
+Die Root-`install.sh` ruft bei Neuinstallation bzw. Update zusätzlich den vorhandenen `samba-share-manager` auf. Dieser installiert Samba, den systemd-Dienst `samba-share-manager.service` und die Verwaltungs-GUI auf **Port 8085**. Die Oberfläche verwendet **Benutzer `admin`** und fragt bei der Einrichtung ein eigenes Passwort von mindestens 12 Zeichen ab. Für SMB-Freigaben wird ein `markus`-Konto verwendet; ein bestehendes Konto wird beibehalten, ein fehlendes Linux-Konto nur ohne initiales Linux-Passwort angelegt und anschließend ein SMB-Passwort interaktiv abgefragt.
+
+Auf einer bereits eingerichteten Stirling-Instanz (z. B. `scanner2`) **nicht `--fresh`** aufrufen, sondern:
+
+```bash
+cd /root/Stirling
+git pull
+bash install.sh --samba-only
+```
+
+Nach Installation:
+
+```bash
+systemctl status samba-share-manager.service --no-pager
+ss -tlnp | grep ':8085'
+```
+
+Weboberfläche: `http://SERVER-IP:8085/`. Ohne TLS ausschließlich im geschützten LAN nutzen; **nicht ins Internet freigeben**. Das Skript legt **keine** Samba-Freigaben und **keine** Processor-Automatisierung an; diese müssen separat eingerichtet werden. Bestehende Share-Manager-Installationen werden zum Schutz der gespeicherten GUI-Zugangsdaten nicht automatisch überschrieben.
+
+**Hinweis:** Die automatische Samba-Integration ist in GitHub implementiert, auf einem frischen System aber noch nicht end-to-end getestet.
