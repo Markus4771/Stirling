@@ -4,6 +4,23 @@ Stand 12.10.2026 · Debian 13 · native JAR, **kein Docker**.
 
 **Status:** Installationsskripte im Repository; noch **nicht** auf einem frisch installierten Zielsystem getestet. Eine erfolgreiche manuelle produktive Bereitstellung auf `scanner` ist dokumentiert. Dieses Repository enthält den QR-Patch und Installer, **nicht** die vollständige Stirling-Quellsoftware oder eine fertige JAR.
 
+## Schnellinstallation: alles in einem Durchlauf
+
+Auf einem frischen Debian-13-amd64-Server als root:
+
+```bash
+apt-get update && apt-get install -y git ca-certificates
+git clone https://github.com/Markus4771/Stirling.git
+cd Stirling
+bash install.sh --fresh
+```
+
+Das Root-Skript installiert Java 25, Node/npm, go-task, OCR-/Office-Werkzeuge, baut den QR-Patch auf Stirling PDF v3.1.0 und legt den Dienst an. **Mindestens 8 GB RAM** für den Frontend-Build empfohlen; Node bekommt standardmäßig 6 GB Heap. Es setzt keine Samba-Freigaben und keine Processor-Pipelines auf. Die Anmeldung im Browser und ein QR-Test bleiben Teil der Abnahme.
+
+Auf einer vorhandenen Installation nur bewusst und mit Wartungsfenster `bash install.sh --upgrade` verwenden (Sicherung durch untergeordnetes Installationsskript).
+
+**Stand:** Dieses integrierte Ein-Befehl-Setup ist neu und noch nicht als Ganzes frisch getestet; manuelle Einzelabschnitte wurden auf `scanner2` erfolgreich geprüft.
+
 ## 1. Voraussetzungen
 - Debian 13 (amd64), Java 25 JDK, Node 20.19+ inklusive npm, git, curl, Python 3, go-task (`task`) und Gradle-Wrapper aus dem Stirling-Checkout.
 - Auf dem Zielsystem: OCRmyPDF, Tesseract (Deutsch/Englisch), Ghostscript, LibreOffice, pdf tools nach den Anforderungen der genutzten Funktionen.
