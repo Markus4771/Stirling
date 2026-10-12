@@ -57,7 +57,7 @@ NoNewPrivileges=no
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=/run /srv /etc/samba /opt/Stirling-PDF/pipeline
+ReadWritePaths=/run /srv /etc /var/lib/samba /var/cache/samba /opt/Stirling-PDF/pipeline
 Environment=SHARE_GUI_HOST=0.0.0.0
 Environment=SHARE_GUI_PORT=${SHARE_GUI_PORT}
 [Install]
