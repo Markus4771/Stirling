@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Privileged, narrowly scoped Samba share operations."""
 import json, os, re, subprocess, sys, tempfile
+from cryptography.fernet import Fernet, InvalidToken
 from pathlib import Path
 
 CONFIG = Path('/etc/samba/share-manager.conf')
@@ -8,6 +9,8 @@ SMB_CONF = Path('/etc/samba/smb.conf')
 BASE = Path('/srv/samba-shares')
 PIPELINE = Path('/opt/Stirling-PDF/pipeline')
 PRESETS = {'general': None, 'input': 'watchedFolders', 'output': 'finishedFolders', 'paperless': None}
+VAULT = Path('/etc/samba-share-manager/passwords.json')
+VAULT_KEY = Path('/etc/samba-share-manager/vault.key')
 NAME_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9_-]{0,39}$')
 
 def fail(msg):
@@ -51,14 +54,49 @@ def put(entries):
     finally:
         if os.path.exists(tmp): os.unlink(tmp)
 
+
+def get_fernet():
+    VAULT_KEY.parent.mkdir(parents=True, exist_ok=True)
+    if not VAULT_KEY.exists():
+        fd=os.open(str(VAULT_KEY),os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+        with os.fdopen(fd,'wb') as out: out.write(Fernet.generate_key())
+    return Fernet(VAULT_KEY.read_bytes())
+
+def password_vault():
+    if not VAULT.exists(): return {}
+    return json.loads(VAULT.read_text())
+
+def save_password(name,password):
+    vault=password_vault()
+    vault[name]=get_fernet().encrypt(password.encode()).decode()
+    fd,tmp=tempfile.mkstemp(dir=str(VAULT.parent))
+    try:
+        with os.fdopen(fd,'w') as out:
+            json.dump(vault,out)
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(tmp,0o600)
+        os.replace(tmp,VAULT)
+    finally:
+        if os.path.exists(tmp): os.unlink(tmp)
+
+def reveal_password(name):
+    token=password_vault().get(name)
+    if not token: fail('Passwort nicht hinterlegt. Bitte einmal neu vergeben.')
+    try: return get_fernet().decrypt(token.encode()).decode()
+    except (InvalidToken, ValueError): fail('Passwortspeicher kann nicht entschlüsselt werden')
+
 def main():
     if os.geteuid()!=0: fail('Root-Berechtigung erforderlich')
-    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path','credentials'): fail('Ungueltige Aktion')
+    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path','credentials','reveal'): fail('Ungueltige Aktion')
     action=sys.argv[1]
     entries=read_entries()
+    if action=='reveal':
+        if len(sys.argv)!=3 or not NAME_RE.fullmatch(sys.argv[2]) or sys.argv[2] not in entries: fail('Freigabe nicht gefunden')
+        print(json.dumps({'ok':True,'password':reveal_password(sys.argv[2])})); return
     if action=='list':
         if len(sys.argv)!=2: fail('Ungueltige Argumente')
-        print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path',''), 'writable':v.get('read only','no')=='no', 'user':v.get('valid users',''), 'password_set':bool(v.get('valid users','')), 'preset': ('paperless' if v.get('comment','')=='Paperless Consume' else 'input' if '/watchedFolders/' in v.get('path','') else 'output' if '/finishedFolders/' in v.get('path','') else 'general')} for n,v in sorted(entries.items())]})); return
+        print(json.dumps({'ok':True,'shares':[{'name':n,'path':v.get('path',''), 'writable':v.get('read only','no')=='no', 'user':v.get('valid users',''), 'password_set':n in password_vault(), 'preset': ('paperless' if v.get('comment','')=='Paperless Consume' else 'input' if '/watchedFolders/' in v.get('path','') else 'output' if '/finishedFolders/' in v.get('path','') else 'general')} for n,v in sorted(entries.items())]})); return
     if (action in ('create','update') and len(sys.argv)!=5) or (action=='delete' and len(sys.argv)!=3) or (action=='set-path' and len(sys.argv)!=4) or (action=='credentials' and len(sys.argv)!=4): fail('Ungueltige Argumente')
     name=sys.argv[2]
     if not NAME_RE.fullmatch(name): fail('Name: Buchstaben, Zahlen, _ oder -, maximal 40 Zeichen')
@@ -82,6 +120,7 @@ def main():
         if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
         entries[name]['valid users']=login
         put(entries)
+        save_password(name,password)
         print(json.dumps({'ok':True,'message':'Samba-Zugang gespeichert (Passwort wird nicht angezeigt)','user':login}))
         return
     if action=='set-path':
@@ -115,7 +154,7 @@ def main():
         if writable not in ('yes','no'): fail('Ungueltige Berechtigung')
         if action=='create' and any(n.casefold()==name.casefold() for n in entries): fail('Freigabe existiert bereits')
         if action=='update' and name not in entries: fail('Freigabe nicht gefunden')
-        if action=='create' and re.search(r'^\s*\['+re.escape(name)+r'\]\s*,SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
+        if action=='create' and re.search(r'^\s*\['+re.escape(name)+r'\]\s*,re.I|re.M): fail('Name in smb.conf bereits vergeben')
         import pwd
         try:
             user=pwd.getpwnam('markus')
@@ -152,6 +191,12 @@ def main():
     else:
         if name not in entries: fail('Freigabe nicht gefunden')
         del entries[name]; put(entries)
+        vault=password_vault()
+        if name in vault:
+            del vault[name]
+            fd,tmp=tempfile.mkstemp(dir=str(VAULT.parent))
+            with os.fdopen(fd,'w') as out: json.dump(vault,out)
+            os.chmod(tmp,0o600); os.replace(tmp,VAULT)
         print(json.dumps({'ok':True,'message':'Freigabe entfernt. Dateien bleiben erhalten.'}))
 
 if __name__=='__main__': main()
