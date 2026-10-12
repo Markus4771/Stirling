@@ -71,7 +71,10 @@ def main():
         password=sys.stdin.readline().rstrip('\n')
         if len(password)<12 or len(password)>256: fail('Passwort muss 12 bis 256 Zeichen haben')
         import pwd
-        try: pwd.getpwnam(login)
+        try:
+            pwd.getpwnam(login)
+            if entries[name].get('valid users')!=login:
+                fail('Bestehender Linux-Benutzer kann aus Sicherheitsgründen nicht übernommen werden')
         except KeyError:
             result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
             if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden')
