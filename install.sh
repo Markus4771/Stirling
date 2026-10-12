@@ -27,7 +27,7 @@ export DEBIAN_FRONTEND=noninteractive
 log "Debian-Abhängigkeiten installieren"
 apt-get update
 apt-get install -y \
-  ca-certificates curl git python3 unzip wget bash build-essential \
+  ca-certificates curl git python3 unzip wget bash build-essential util-linux \
   openjdk-25-jdk nodejs npm golang-go \
   libreoffice tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
   ocrmypdf ghostscript poppler-utils qpdf pngquant \
@@ -53,9 +53,22 @@ task --version
 
 TOTAL_MEM_KB="$(awk '/MemTotal:/ {print $2}' /proc/meminfo)"
 if (( TOTAL_MEM_KB < 7*1024*1024 )); then
-  die "Für den vollständigen Frontend-Build mindestens 8 GB VM-RAM empfohlen; aktuell $(awk "BEGIN {printf \"%.1f\", $TOTAL_MEM_KB/1024/1024}") GiB. VM-RAM erhöhen und erneut starten."
+  log "Wenig RAM für Frontend-Build: 4 GiB können mit Swap ausreichen; Build dauert ggf. länger"
+  if ! swapon --noheadings --show=NAME | grep -q .; then
+    SWAPFILE=/var/swap-stirling-build
+    if [[ ! -e "$SWAPFILE" ]]; then
+      # Temporary build reserve, not an application/runtime requirement.
+      dd if=/dev/zero of="$SWAPFILE" bs=1M count=4096 status=progress
+      chmod 600 "$SWAPFILE"
+      mkswap "$SWAPFILE" >/dev/null
+    fi
+    swapon "$SWAPFILE" || die "Swap konnte nicht aktiviert werden."
+    log "4 GiB Swap als Build-Reserve aktiviert: $SWAPFILE"
+  fi
+  export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=3072}"
+else
+  export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}"
 fi
-export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}"
 
 log "QR-Stirling aus Upstream v3.1.0 bauen"
 # Use explicit build root for root; prevent checkout from an unrelated user.
