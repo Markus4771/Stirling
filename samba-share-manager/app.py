@@ -8,10 +8,29 @@ AUTH='/etc/samba-share-manager/auth.json'
 HOST=os.environ.get('SHARE_GUI_HOST','0.0.0.0')
 PORT=int(os.environ.get('SHARE_GUI_PORT','8765'))
 
-STYLE='''<style>body{font:16px system-ui,sans-serif;background:#f3f5f9;color:#18243a;margin:0}main{max-width:820px;margin:50px auto;padding:22px}.card{background:white;padding:28px;border-radius:14px;margin:20px 0;box-shadow:0 3px 15px #2231}input,button,select{padding:12px 14px;font:inherit;border-radius:7px;border:1px solid #bbc4d2}input{width:min(90%,350px)}button{background:#215bd6;color:#fff;border:0;cursor:pointer}button.danger{background:#b42332}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:15px;border-bottom:1px solid #ddd}.muted{color:#64718a}.err{color:#b42332}.ok{color:#126b45}code{background:#f3f5f9;padding:4px;border-radius:4px}</style>'''
+STYLE='''<style>
+:root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#292929;background:#f7f7f6}
+*{box-sizing:border-box}body{margin:0} .layout{display:grid;grid-template-columns:275px 1fr;min-height:100vh}
+aside{background:#fafafa;border-right:1px solid #e6e6e6;padding:22px 14px}
+.brand{font-size:24px;font-weight:750;padding:3px 13px 28px}.brand span{color:#a75551}
+.nav{padding:13px 16px;border-radius:8px;font-size:15px}.nav.active{background:#302f2d;color:white;font-weight:650}
+main{padding:36px 45px;max-width:1470px;width:100%;margin:auto}header{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;margin-bottom:26px}
+h1{font-size:25px;font-weight:650;margin:0}h2{font-size:18px;font-weight:650;margin:0 0 18px}
+.subtitle,.muted{color:#737373;font-size:14px}.cards{display:grid;grid-template-columns:minmax(310px,430px) minmax(400px,1fr);gap:22px;align-items:start}
+.card{background:white;border:1px solid #e5e5e5;border-radius:12px;padding:24px;margin-bottom:16px}
+input,select,button{font:inherit;font-size:14px;border-radius:8px}input,select{width:100%;background:#fff;border:1px solid #d8d8d8;padding:11px;margin:7px 0 14px}
+label{font-size:13px;font-weight:600;color:#555}button{padding:10px 15px;border:0;background:#353330;color:white;cursor:pointer;font-weight:600}
+button.secondary{background:#f1f1f1;color:#333;border:1px solid #e2e2e2}button.danger{background:#fff0f0;color:#a52828}
+button:hover{filter:brightness(.94)}form.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}form.inline>*{margin:3px 0}
+.share{padding:20px 0;border-top:1px solid #eee}.share:first-of-type{border-top:0}.share-head{display:flex;justify-content:space-between;align-items:start;gap:8px}
+.share h3{font-size:16px;margin:0 0 5px}.path{font-size:12px;word-break:break-all;color:#737373}
+.tag{background:#eff6f0;color:#25713b;padding:5px 9px;border-radius:6px;font-size:12px}.credentials{display:grid;grid-template-columns:1fr 1fr auto;gap:9px;align-items:end}.credentials input{margin-bottom:0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{margin-top:10px}.notice{padding:13px 16px;border-radius:8px;border:1px solid #cddacc;background:#f5faf5;margin-bottom:20px}.notice.err{background:#fff6f6;border-color:#edcbcb;color:#922}
+@media(max-width:1000px){.cards{grid-template-columns:1fr}.layout{grid-template-columns:1fr}aside{display:none}main{padding:20px}.credentials{grid-template-columns:1fr}}
+</style>'''
 
-def helper(*args):
-    p=subprocess.run(['/usr/bin/sudo','-n', '/usr/local/lib/samba-share-manager/helper.py',*args],capture_output=True,text=True,timeout=15)
+def helper(*args,stdin_data=None):
+    p=subprocess.run(['/usr/bin/sudo','-n', '/usr/local/lib/samba-share-manager/helper.py',*args],capture_output=True,text=True,timeout=15,input=(stdin_data+'\n' if stdin_data is not None else None))
     try:return json.loads(p.stdout)
     except ValueError:return {'ok':False,'error':(p.stderr or 'Unbekannter Fehler')[-300:]}
 
@@ -48,17 +67,29 @@ class Handler(BaseHTTPRequestHandler):
         data=helper('list')
         rows=''
         for share in data.get('shares',[]):
-            name=html.escape(share['name']);path=html.escape(share['path'])
-            rows+=f'''<tr><td><strong>{name}</strong><br><span class="muted"><code>{path}</code></span></td><td>
-            <form method="post" action="/update"><input type="hidden" name="name" value="{name}">
-            <input type="hidden" name="preset" value="{'input' if '/pipeline/watchedFolders/' in path else 'output' if '/pipeline/finishedFolders/' in path else 'general'}">
-            <select name="writable"><option value="yes" {'selected' if share.get('writable') else ''}>Schreiben erlaubt</option>
-            <option value="no" {'selected' if not share.get('writable') else ''}>Nur lesen</option></select>
-            <button type="submit">Speichern</button></form><form method="post" action="/set-path"><input type="hidden" name="name" value="{name}"><label>Zielpfad ändern</label><input name="path" value="{path}" required style="width:95%;box-sizing:border-box"><button type="submit">Pfad übernehmen</button></form>
-            <form method="post" action="/delete"><input type="hidden" name="name" value="{name}"><button class="danger" type="submit">Entfernen</button></form></td></tr>'''
-        status=('<p class="'+('err' if is_error else 'ok')+'">'+html.escape(message)+'</p>') if message else ''
-        if not data.get('ok'):status='<p class="err">'+html.escape(data.get('error','Fehler'))+'</p>'
-        self.respond(200,f'''<main><h1>Samba-Freigaben</h1><p class="muted">Server scanner · verwaltete Freigaben · Samba-Benutzer markus</p>{status}<section class="card"><h2>Neue Freigabe</h2><form method="post" action="/create"><label for="name">Freigabename</label><p><input id="name" name="name" placeholder="z. B. Scan-Eingang" pattern="[a-zA-Z][a-zA-Z0-9_-]{{0,39}}" required></p><label>Ordner</label><p><select name="preset"><option value="general">Allgemein (/srv/samba-shares)</option><option value="input">Stirling PDF Eingang</option><option value="output">Stirling PDF Ausgang</option></select></p><label>Zugriff</label><p><select name="writable"><option value="yes">Lesen und Schreiben</option><option value="no">Nur lesen</option></select></p><button type="submit">Freigabe erstellen</button></form><p class="muted">Der Ordner wird je nach Auswahl im allgemeinen Bereich oder unter Stirling PDF angelegt.</p></section><section class="card"><h2>Vorhandene Freigaben</h2><table><tr><th>Name und Pfad</th><th>Aktion</th></tr>{rows or '<tr><td colspan="2">Noch keine Freigaben</td></tr>'}</table></section><p class="muted">Beim Entfernen werden Dateien auf dem Server nicht gelöscht. Bestehende, anderweitig konfigurierte Freigaben bleiben unverändert.</p></main>''')
+            name=html.escape(share['name'],quote=True)
+            path=html.escape(share['path'],quote=True)
+            login=html.escape(share.get('user',''),quote=True)
+            preset=share.get('preset','general')
+            options=''.join('<option value="'+v+'"'+(' selected' if preset==v else '')+'>'+t+'</option>' for v,t in [('general','Allgemein'),('input','Stirling Eingang'),('output','Stirling Ausgang'),('paperless','Paperless Consume')])
+            status='Passwort gesetzt · nicht auslesbar' if share.get('password_set') else 'Noch keine Anmeldedaten'
+            rows+=f'''<section class="share"><div class="share-head"><div><h3>{name}</h3><div class="path">{path}</div><div class="muted">SMB-Benutzer: <strong>{login or '–'}</strong> · {status}</div></div><span class="tag">Aktiv</span></div>
+            <form method="post" action="/credentials"><input type="hidden" name="name" value="{name}"><div class="credentials"><div><label>SMB-Benutzer</label><input name="user" value="{login}" pattern="[a-z][a-z0-9_]{{2,30}}" required autocomplete="off"></div><div><label>Neues SMB-Passwort (mind. 12 Zeichen)</label><input type="password" name="password" minlength="12" required autocomplete="new-password"></div><button type="submit">Zugang speichern</button></div></form>
+            <form method="post" action="/update" class="inline actions"><input type="hidden" name="name" value="{name}"><input type="hidden" name="preset" value="{preset}">
+            <select name="writable" style="width:auto"><option value="yes" {'selected' if share.get('writable') else ''}>Lesen und Schreiben</option><option value="no" {'selected' if not share.get('writable') else ''}>Nur lesen</option></select><button class="secondary">Rechte speichern</button></form>
+            <form method="post" action="/set-path" class="inline actions"><input type="hidden" name="name" value="{name}"><input name="path" value="{path}" style="flex:1;min-width:190px" required><button class="secondary">Pfad übernehmen</button></form>
+            <form method="post" action="/delete" class="actions"><input type="hidden" name="name" value="{name}"><button class="danger">Freigabe entfernen</button></form></section>'''
+        notice=('<div class="notice'+(' err' if is_error else '')+'">'+html.escape(message)+'</div>') if message else ''
+        if not data.get('ok'):notice='<div class="notice err">'+html.escape(data.get('error','Fehler'))+'</div>'
+        self.respond(200,f'''<div class="layout"><aside><div class="brand"><span>◢</span> Stirling</div><div class="nav">PDF-Prozessor</div><div class="nav">Startseite</div><div class="nav active">Samba-Freigaben</div><div class="nav">Pipelines</div><div class="nav">Dokumente</div><div class="nav">Integrationen</div></aside>
+        <main><header><div><h1>Samba-Freigaben</h1><p class="subtitle">Freigaben, Benutzer und Zugriffsrechte verwalten</p></div><span class="tag">Port {PORT}</span></header>{notice}
+        <div class="cards"><section class="card"><h2>Neue Freigabe</h2><form method="post" action="/create"><label>Freigabename</label><input name="name" pattern="[a-zA-Z][a-zA-Z0-9_-]{{0,39}}" placeholder="z. B. Scan-Ausgang" required>
+        <label>Ziel / Verwendung</label><select name="preset"><option value="general">Allgemein</option><option value="input">Stirling PDF Eingang</option><option value="output">Stirling PDF Ausgang</option><option value="paperless">Paperless Consume (Ausgang)</option></select>
+        <label>Schreibrechte</label><select name="writable"><option value="yes">Lesen und Schreiben</option><option value="no">Nur lesen</option></select>
+        <button type="submit">Freigabe erstellen</button></form><p class="muted">Anschließend unter „Vorhandene Freigaben“ den eigenen SMB-Benutzer und sein Passwort festlegen.</p>
+        <p class="muted">Paperless Consume muss denselben Ordner sehen (z. B. durch Einbinden der Freigabe). Nur die Freigabe zu erstellen löst noch keinen Import aus.</p></section>
+        <section class="card"><h2>Vorhandene Freigaben ({len(data.get('shares',[]))})</h2>{rows or '<p class="muted">Noch keine Freigaben vorhanden.</p>'}</section></div>
+        </main></div>''')
 
     def do_GET(self):
         if not self.guard():return
@@ -67,7 +98,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if not self.guard():return
-        if self.path not in ('/create','/update','/delete','/set-path'):
+        if self.path not in ('/create','/update','/delete','/set-path','/credentials'):
             self.respond(404,'<main>Nicht gefunden</main>');return
         origin=self.headers.get('Origin')
         expected=f'http://{self.headers.get("Host","")}'
@@ -75,10 +106,10 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(403,'<main>Ungueltiger Ursprung</main>');return
         try:
             length=int(self.headers.get('Content-Length','0'))
-            if not (0<length<1024):raise ValueError()
+            if not (0<length<4096):raise ValueError()
             form=parse_qs(self.rfile.read(length).decode())
             name=form.get('name',[''])[0]
-            result=(helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('delete',name) if self.path=='/delete' else helper(self.path[1:],name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
+            result=(helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('credentials',name,form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/credentials' else helper('delete',name) if self.path=='/delete' else helper(self.path[1:],name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
             self.page(result.get('message',result.get('error','Fehler')),not result.get('ok'))
         except (ValueError,UnicodeError):self.respond(400,'<main>Ungueltige Anfrage</main>')
 
