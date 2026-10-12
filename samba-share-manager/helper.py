@@ -68,14 +68,14 @@ def main():
         if not re.fullmatch(r'[a-z][a-z0-9_]{2,30}',login): fail('Benutzer: 3-31 Kleinbuchstaben, Ziffern, _')
         for share,entry in entries.items():
             if share!=name and entry.get('valid users')==login: fail('Samba-Benutzer bereits einer anderen Freigabe zugeordnet')
-        password=sys.stdin.readline().rstrip('\\n')
+        password=sys.stdin.readline().rstrip('\n')
         if len(password)<12 or len(password)>256: fail('Passwort muss 12 bis 256 Zeichen haben')
         import pwd
         try: pwd.getpwnam(login)
         except KeyError:
             result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
             if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden')
-        result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\\n'+password+'\\n',capture_output=True,text=True,timeout=15)
+        result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\n'+password+'\n',capture_output=True,text=True,timeout=15)
         if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
         previous=entries[name].get('valid users','')
         entries[name]['valid users']=login
@@ -113,7 +113,47 @@ def main():
         if writable not in ('yes','no'): fail('Ungueltige Berechtigung')
         if action=='create' and any(n.casefold()==name.casefold() for n in entries): fail('Freigabe existiert bereits')
         if action=='update' and name not in entries: fail('Freigabe nicht gefunden')
-        if action=='create' and re.search(r'^\\s*\\['+re.escape(name)+r'\\]\\s*$',SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
+        if action=='create' and re.search(r'^\s*\['+re.escape(name)+r'\]\s*,SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
+        import pwd
+        try:
+            user=pwd.getpwnam('markus')
+            stirling=pwd.getpwnam('stirling')
+        except KeyError: fail('Linux-Benutzer markus oder stirling fehlt')
+        if preset in ('general','paperless'):
+            directory=(BASE/'Paperless-Consume' if preset=='paperless' else BASE/name)
+            owner=user
+        else:
+            directory=PIPELINE/PRESETS[preset]/name
+            owner=stirling
+        # Do not change ownership of an existing folder. Pipeline directories
+        # are created only if absent and are never removed by this application.
+        if action=='create' and directory.exists():
+            fail('Zielordner existiert bereits; keine automatische Uebernahme')
+        if action=='update' and entries[name].get('path')!=str(directory):
+            fail('Pfadwechsel bestehender Freigaben nicht erlaubt: erst Freigabe entfernen, dann neu erstellen')
+        if not directory.exists():
+            parent=directory.parent
+            if preset in ('general','paperless'):
+                BASE.mkdir(mode=0o755,parents=True,exist_ok=True)
+            elif not parent.is_dir() or parent.is_symlink():
+                fail('Stirling-PDF-Zielverzeichnis existiert nicht')
+            directory.mkdir(mode=0o2770)
+            os.chown(directory,owner.pw_uid,owner.pw_gid)
+            os.chmod(directory,0o2770)
+        if directory.is_symlink(): fail('Symbolische Links sind nicht erlaubt')
+        entries[name]={'path':str(directory),'browseable':'yes','read only':'no' if writable=='yes' else 'yes',
+                       'valid users':(entries.get(name,{}).get('valid users','markus')),'force user':owner.pw_name,
+                       'comment':('Paperless Consume' if preset=='paperless' else 'Verwaltet durch Samba Share Manager'),
+                       'create mask':'0660','directory mask':'2770'}
+        put(entries)
+        print(json.dumps({'ok':True,'message':'Freigabe gespeichert','path':str(directory)}))
+    else:
+        if name not in entries: fail('Freigabe nicht gefunden')
+        del entries[name]; put(entries)
+        print(json.dumps({'ok':True,'message':'Freigabe entfernt. Dateien bleiben erhalten.'}))
+
+if __name__=='__main__': main()
+,SMB_CONF.read_text(),re.I|re.M): fail('Name in smb.conf bereits vergeben')
         import pwd
         try:
             user=pwd.getpwnam('markus')
