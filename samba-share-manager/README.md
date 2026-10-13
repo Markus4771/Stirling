@@ -112,3 +112,13 @@ Beim Anlegen und Bearbeiten dürfen SMB-Benutzernamen frei gewählt werden, z. B
 Neue, vom Samba-Manager angelegte Freigaben erhalten automatisch eine POSIX-ACL für den Dienstbenutzer `stirling` auf dem Freigabe-Verzeichnis (`u:stirling:rwx`) sowie eine Default-ACL (`d:u:stirling:rwx`) für neue Unterordner/Dateien. Eigentümer und bestehende Dateien werden nicht geändert. Die GUI bietet unter **Vorhandene Freigaben → Stirling-Zugriffsrechte setzen** dieselbe Aktion nachträglich für bestehende Shares. Beim Pfadwechsel werden die Rechte am neuen Zielordner vergeben. Voraussetzung ist `acl` / `setfacl` auf dem Server.
 
 **Getrennte Freigabe in Stirling:** ACL-Rechte allein erlauben noch keine Ordnerautomatisierung. Zusätzlich muss `/srv/samba-shares` in den Stirling-Einstellungen als zulässiges Stammverzeichnis konfiguriert werden. Für bereits bestehende Dateien (vor der ACL-Änderung) werden keine rekursiven Änderungen vorgenommen.
+
+## Ein SMB-Benutzer für mehrere Freigaben (13.10.2026)
+
+Der Samba-Share-Manager erlaubt jetzt die **Wiederverwendung eines bereits vom Manager verwalteten SMB-Benutzers** für mehrere Freigaben. Beim Erstellen einer weiteren Freigabe denselben Benutzernamen und dasselbe vorhandene Passwort eingeben. Die Benutzeranlage wird dabei übersprungen; der bisherige Samba-Benutzer bleibt bestehen, und das vorhandene Samba-Passwort wird beim Anlegen einer weiteren Freigabe **nicht geändert**. Stimmt das Passwort nicht überein, erscheint eine Fehlermeldung.
+
+Bei Änderung des Passworts für einen mehrfach verwendeten Benutzer wird dieses eine Samba-Passwort aktualisiert und die verschlüsselte Passwortanzeige aller Freigaben mit diesem Benutzer synchronisiert. Das Ändern des Benutzernamens einer Freigabe auf einen vorhandenen Manager-Benutzer ist möglich; das Passwort kann dann leer bleiben und wird übernommen. Fremde Linux-/Samba-Konten ohne zugehörige Manager-Freigabe werden weiterhin nicht übernommen.
+
+**Windows:** Freigaben auf derselben Server-IP müssen mit denselben SMB-Zugangsdaten verbunden werden, z. B. `\\\\192.168.0.54\\Scan-Eingang1` auf `W:` und `\\\\192.168.0.54\\Scan-Ausgang` auf `X:`. Bestehende Windows-Verbindungen mit abweichenden Zugangsdaten ggf. zuvor gezielt trennen.
+
+Die Funktion ist im Repository implementiert; Live-Test auf dem Server steht noch aus.
