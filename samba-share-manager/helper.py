@@ -86,11 +86,34 @@ def reveal_password(name):
     try: return get_fernet().decrypt(token.encode()).decode()
     except (InvalidToken, ValueError): fail('Passwortspeicher kann nicht entschlüsselt werden')
 
+def grant_stirling_access(path):
+    """Grant Stirling access while retaining owner and group; never recurse through user files."""
+    import pwd
+    pwd.getpwnam('stirling')
+    if path.is_symlink() or not path.is_dir() or path.resolve()!=path:
+        fail('ACL-Zielordner ungueltig')
+    allowed=(BASE,PIPELINE/'watchedFolders',PIPELINE/'finishedFolders')
+    if not any(root in path.parents for root in allowed):
+        fail('ACL-Zielordner ausserhalb der erlaubten Verzeichnisse')
+    for acl in ('u:stirling:rwx','d:u:stirling:rwx'):
+        result=subprocess.run(['setfacl','-m',acl,str(path)],capture_output=True,text=True)
+        if result.returncode:
+            fail('ACL-Rechte fuer stirling konnten nicht gesetzt werden: '+result.stderr[-350:])
+    for permission in ('-r','-w'):
+        result=subprocess.run(['runuser','-u','stirling','--','test',permission,str(path)],capture_output=True,text=True)
+        if result.returncode: fail('Stirling-Benutzer kann Zielordner nicht lesen/schreiben: '+str(path))
+
 def main():
     if os.geteuid()!=0: fail('Root-Berechtigung erforderlich')
-    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path','credentials','reveal'): fail('Ungueltige Aktion')
+    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path','credentials','reveal','grant-acl'): fail('Ungueltige Aktion')
     action=sys.argv[1]
     entries=read_entries()
+    if action=='grant-acl':
+        if len(sys.argv)!=3 or not NAME_RE.fullmatch(sys.argv[2]) or sys.argv[2] not in entries: fail('Freigabe nicht gefunden')
+        target=Path(entries[sys.argv[2]].get('path',''))
+        grant_stirling_access(target)
+        print(json.dumps({'ok':True,'message':'Stirling-Lese-/Schreibrechte fuer diese Freigabe gesetzt'}))
+        return
     if action=='reveal':
         if len(sys.argv)!=3 or not NAME_RE.fullmatch(sys.argv[2]) or sys.argv[2] not in entries: fail('Freigabe nicht gefunden')
         print(json.dumps({'ok':True,'password':reveal_password(sys.argv[2])})); return
@@ -147,6 +170,7 @@ def main():
         required='-w' if entries[name].get('read only','no')=='no' else '-r'
         check=subprocess.run(['runuser','-u',owner.pw_name,'--','test',required,str(target)],capture_output=True)
         if check.returncode: fail('Zielordner ist fuer Samba-Benutzer '+owner.pw_name+' nicht ausreichend berechtigt')
+        grant_stirling_access(target)
         entries[name]['path']=str(target)
         entries[name]['force user']=owner.pw_name
         put(entries)
@@ -229,6 +253,7 @@ def main():
                        'comment':('Paperless Consume' if preset=='paperless' else 'Verwaltet durch Samba Share Manager'),
                        'create mask':'0660','directory mask':'2770'}
         put(entries)
+        grant_stirling_access(directory)
         if action=='create': save_password(name,password)
         print(json.dumps({'ok':True,'message':'Freigabe mit SMB-Benutzer gespeichert' if action=='create' else 'Freigabe aktualisiert','path':str(directory)}))
     else:
