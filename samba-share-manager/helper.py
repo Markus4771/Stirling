@@ -132,7 +132,9 @@ def main():
         previous_login=entries[name].get('valid users','')
         if not password:
             if login==previous_login: fail('Zum Ändern des Passworts ein neues Passwort eingeben')
-            password=reveal_password(name)
+            password=reveal_password(linked[0] if linked else name)
+        if linked and login!=previous_login and password!=reveal_password(linked[0]):
+            fail('Bei Wiederverwendung eines SMB-Benutzers muss das Passwort mit dessen aktuellem Passwort übereinstimmen. Alternativ Passwortfeld leer lassen.')
         if len(password)<12 or len(password)>256: fail('Passwort muss 12 bis 256 Zeichen haben')
         import pwd
         try:
