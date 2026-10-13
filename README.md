@@ -309,7 +309,7 @@ Artefakt: `app/core/build/libs/stirling-pdf-3.1.0.jar`. Vor produktiven Änderun
 
 ## Samba-Verwaltungsoberfläche (ab 12.10.2026)
 
-Die Root-`install.sh` ruft bei Neuinstallation bzw. Update zusätzlich den vorhandenen `samba-share-manager` auf. Dieser installiert Samba, den systemd-Dienst `samba-share-manager.service` und die Verwaltungs-GUI auf **Port 8085**. Die Oberfläche verwendet **Benutzer `admin`** und fragt bei der Einrichtung ein eigenes Passwort von mindestens 12 Zeichen ab. Für SMB-Freigaben wird ein `markus`-Konto verwendet; ein bestehendes Konto wird beibehalten, ein fehlendes Linux-Konto nur ohne initiales Linux-Passwort angelegt und anschließend ein SMB-Passwort interaktiv abgefragt.
+Die Root-`install.sh` ruft bei Neuinstallation bzw. Update zusätzlich den vorhandenen `samba-share-manager` auf. Dieser installiert Samba, den systemd-Dienst `samba-share-manager.service` und die Verwaltungs-GUI auf **Port 8085**. Die Oberfläche verwendet **Benutzer `admin`** und fragt bei der Einrichtung ein eigenes Passwort von mindestens 12 Zeichen ab. Für SMB-Freigaben wird ein `markus`-Konto verwendet; ein bestehendes Konto wird beibehalten, ein fehlendes Linux-Konto nur ohne initiales Linux-Passwort angelegt ; das SMB-Passwort wird später im Manager vergeben.
 
 Auf einer bereits eingerichteten Stirling-Instanz (z. B. `scanner2`) **nicht `--fresh`** aufrufen, sondern:
 
@@ -329,3 +329,23 @@ ss -tlnp | grep ':8085'
 Weboberfläche: `http://SERVER-IP:8085/`. Ohne TLS ausschließlich im geschützten LAN nutzen; **nicht ins Internet freigeben**. Das Skript legt **keine** Samba-Freigaben und **keine** Processor-Automatisierung an; diese müssen separat eingerichtet werden. Bestehende Share-Manager-Installationen werden zum Schutz der gespeicherten GUI-Zugangsdaten nicht automatisch überschrieben.
 
 **Hinweis:** Die automatische Samba-Integration ist in GitHub implementiert, auf einem frischen System aber noch nicht end-to-end getestet.
+
+## Aktueller Gesamtstand für frisches Debian 13 (13.10.2026)
+
+Auf einer **leeren Debian-13-amd64-VM** als root installieren:
+
+```bash
+apt update && apt install -y git ca-certificates
+cd /root
+git clone https://github.com/Markus4771/Stirling.git
+cd Stirling
+bash install.sh --fresh
+```
+
+Das Skript baut Stirling PDF mit der QR-Erweiterung, installiert Stirling auf Port **8080** sowie Samba und den eigenen Samba-Share-Manager auf Port **8085**. Es installiert Java 25, Node/npm, go-task, Python/Cryptography und PDF-/OCR-Werkzeuge. Bei 4 GB RAM wird bei Bedarf Swap für den Build aktiviert. Das GUI-Admin-Passwort (mindestens 12 Zeichen) wird während der Installation vergeben. Ein SMB-Passwort für das lokale Dateisystemkonto `markus` wird **nicht mehr vorab verlangt**.
+
+**SMB-Benutzer mehrfach verwenden:** Direkt beim Anlegen jeder Freigabe Benutzername und Passwort angeben. Bereits vom Manager verwaltete SMB-Benutzer können mit demselben Passwort für weitere Freigaben verwendet werden. Passwortänderungen an gemeinsam genutzten Konten betreffen alle verknüpften Freigaben. Passwortanzeige per Augensymbol innerhalb der angemeldeten Verwaltungsoberfläche. Für Windows-Verbindungen auf dieselbe Server-IP denselben SMB-Benutzer verwenden.
+
+**Ordner und Rechte:** Der Share-Manager setzt ACLs für den Dienstbenutzer `stirling` automatisch bei neuen Freigaben und bietet für bereits vorhandene die Aktion **Stirling-Zugriffsrechte setzen**. In Stirling PDF muss `/srv/samba-shares` zusätzlich unter **Einstellungen für Ordnerzugriff** als zulässiges Stammverzeichnis eingetragen werden; diese Einstellung nimmt der Installer noch nicht automatisch vor. Paperless-Consume ist als zusätzlicher Share-Typ verfügbar, aber Paperless selbst benötigt noch eine Verbindung zu diesem Ordner.
+
+**Prüfung:** `systemctl is-active stirlingpdf smbd samba-share-manager`, `testparm -s`, GUI-Login auf Port 8080 und 8085, QR-Trennung sowie SMB-Verbindung mit zwei Netzlaufwerken testen. Das Skript prüft Dienste und Erreichbarkeit, jedoch noch nicht sämtliche fachlichen Abläufe. **Der gesamte aktuelle Neuinstallationsstand wurde noch nicht auf einer frisch aufgesetzten VM end-to-end verifiziert.**
