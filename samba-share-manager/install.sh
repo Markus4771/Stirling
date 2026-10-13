@@ -7,7 +7,6 @@ for c in testparm systemctl python3 visudo; do command -v "$c" >/dev/null || { e
 test -d /opt/Stirling-PDF/pipeline/watchedFolders && test -d /opt/Stirling-PDF/pipeline/finishedFolders || { echo 'Stirling-PDF-Pipeline-Verzeichnisse fehlen'; exit 1; }
 id stirling >/dev/null || { echo 'Stirling-Benutzer fehlt'; exit 1; }
 id markus >/dev/null || { echo 'Linux-Benutzer markus fehlt.'; exit 1; }
-pdbedit -L 2>/dev/null | grep -q '^markus:' || { echo 'Samba-Benutzer markus fehlt: sudo smbpasswd -a markus'; exit 1; }
 read -r -s -p 'Neues GUI-Passwort fuer Benutzer admin: ' PASS; echo
 [[ ${#PASS} -ge 12 ]] || { echo 'Mindestens 12 Zeichen erforderlich.'; exit 1; }
 if ! id samba-gui >/dev/null 2>&1; then useradd --system --home /nonexistent --shell /usr/sbin/nologin samba-gui; fi
@@ -67,5 +66,5 @@ systemctl daemon-reload
 systemctl enable samba-share-manager.service
 systemctl restart samba-share-manager.service
 systemctl reload smbd
-echo 'Fertig. Browser: http://SERVER-IP:${SHARE_GUI_PORT}/  Login: admin'
+echo "Fertig. Browser: http://SERVER-IP:${SHARE_GUI_PORT}/  Login: admin"
 echo 'Sicherheitsinfo: nur im vertrauenswuerdigen LAN verwenden; fuer Fernzugriff HTTPS via Reverse Proxy.'
