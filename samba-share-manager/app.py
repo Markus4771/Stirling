@@ -135,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
                 result=helper('change-admin-password',stdin_data=password)
                 if not result.get('ok'):
                     self.password_change_page(result.get('error','Passwortänderung fehlgeschlagen'),True);return
-                self.respond(401,'<main><h1>Passwort geändert</h1><p>Bitte mit dem neuen Passwort anmelden. Falls der Browser weiterhin die alten Zugangsdaten sendet, Browserfenster schließen und erneut öffnen.</p></main>',True)
+                self.respond(200,'<main style="max-width:550px"><section class="card"><h1>Passwort erfolgreich geändert</h1><p>Das neue Administratorpasswort wurde gespeichert. Die bisherige HTTP-Basic-Anmeldung ist dadurch ungültig.</p><p><strong>Wichtig:</strong> Bitte ein privates Browserfenster öffnen und die Samba-Verwaltung mit Benutzer admin und dem neuen Passwort aufrufen. Der Browser kann die alten Zugangsdaten sonst automatisch erneut senden.</p></section></main>')
                 return
             if self.must_change_password():
                 self.password_change_page('Zuerst das Administratorpasswort ändern.',True);return
