@@ -103,7 +103,7 @@ def main():
     if action=='credentials':
         if name not in entries: fail('Freigabe nicht gefunden')
         login=sys.argv[3]
-        if not re.fullmatch(r'share_[a-z][a-z0-9_]{1,24}',login): fail('Benutzer muss mit share_ beginnen (z.B. share_scan), danach Kleinbuchstaben, Ziffern, _')
+        if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{2,30}',login): fail('SMB-Benutzer: 3–31 Zeichen, beginnend mit einem Buchstaben; erlaubt sind Buchstaben, Zahlen, _ und -')
         for share,entry in entries.items():
             if share!=name and entry.get('valid users')==login: fail('Samba-Benutzer bereits einer anderen Freigabe zugeordnet')
         password=sys.stdin.readline().rstrip('\n')
@@ -159,8 +159,8 @@ def main():
         if writable not in ('yes','no'): fail('Ungueltige Berechtigung')
         if action=='create':
             login=sys.argv[5]
-            if not re.fullmatch(r'share_[a-z][a-z0-9_]{1,24}', login):
-                fail('SMB-Benutzer muss mit share_ beginnen (z. B. share_scan)')
+            if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{2,30}', login):
+                fail('SMB-Benutzer: 3–31 Zeichen, beginnend mit einem Buchstaben; erlaubt sind Buchstaben, Zahlen, _ und -')
             password=sys.stdin.readline().rstrip('\n')
             if len(password)<12 or len(password)>256: fail('SMB-Passwort muss 12 bis 256 Zeichen haben')
             if any(v.get('valid users')==login for v in entries.values()):
