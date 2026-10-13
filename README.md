@@ -439,3 +439,9 @@ Das Skript baut Stirling PDF mit der QR-Erweiterung, installiert Stirling auf Po
 **Ordner und Rechte:** Der Share-Manager setzt ACLs für den Dienstbenutzer `stirling` automatisch bei neuen Freigaben und bietet für bereits vorhandene die Aktion **Stirling-Zugriffsrechte setzen**. In Stirling PDF muss `/srv/samba-shares` zusätzlich unter **Einstellungen für Ordnerzugriff** als zulässiges Stammverzeichnis eingetragen werden; diese Einstellung nimmt der Installer noch nicht automatisch vor. Paperless-Consume ist als zusätzlicher Share-Typ verfügbar, aber Paperless selbst benötigt noch eine Verbindung zu diesem Ordner.
 
 **Prüfung:** `systemctl is-active stirlingpdf smbd samba-share-manager`, `testparm -s`, GUI-Login auf Port 8080 und 8085, QR-Trennung sowie SMB-Verbindung mit zwei Netzlaufwerken testen. Das Skript prüft Dienste und Erreichbarkeit, jedoch noch nicht sämtliche fachlichen Abläufe. **Der gesamte aktuelle Neuinstallationsstand wurde noch nicht auf einer frisch aufgesetzten VM end-to-end verifiziert.**
+
+## Erstanmeldung an der Samba-Weboberfläche (Stand 13.10.2026)
+
+Bei einer **frischen Installation** erstellt das Setup ein **zufälliges Einmalpasswort** für den Webadministrator `admin` und zeigt es **einmal im Terminal** an. Beim ersten Login unter `http://SERVER-IP:8085` wird ausschließlich die Seite zur Passwortänderung freigeschaltet. Das neue Administratorpasswort muss mindestens **12 Zeichen** lang sein. Erst danach kann die Freigabenverwaltung genutzt werden.
+
+Aus Sicherheitsgründen wird kein allgemein bekanntes festes Startpasswort ausgeliefert. Bei Updates bleiben bereits bestehende Zugangsdaten unverändert; eine Neuinstallation darf bestehende Anmeldedaten nicht überschreiben. Das Samba-GUI-Passwort ist unabhängig von den SMB-Passwörtern für Windows-Netzlaufwerke. Die Oberfläche nur im vertrauenswürdigen LAN oder hinter TLS betreiben.
