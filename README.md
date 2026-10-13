@@ -1,18 +1,79 @@
-# Stirling PDF – Installation und Scanserver
+# Stirling PDF – Scanserver mit QR-Trennung und Samba-Verwaltung
 
-> **Neu:** Für die vollständige Ein-Befehl-Installation von Stirling mit QR-Patch unter Debian 13: `sudo bash install.sh --fresh`. Weitere Hinweise in [INSTALLATION.md](INSTALLATION.md). Installationsskripte unter [scripts/](scripts/). Die bestehende produktive Instanz muss dafür nicht erneut installiert werden.
+**Aktueller Stand: 13.10.2026 · Debian 13 (amd64) · Installation ohne Docker**
 
-Dokumentation für den Server `scanner` auf **Debian 13.7**, ohne Docker. Dieses Repository dokumentiert die Installation von Stirling PDF als geplanten Ersatz für ScanPro; es enthält nicht die Stirling-PDF-Quellsoftware.
+Dieses Repository enthält die Installations- und Build-Skripte für Stirling PDF 3.1.0 mit QR-Code-Trennung sowie einen eigenen Samba-Share-Manager. Die Stirling-PDF-Quelldateien werden vom Build-Skript bezogen; es ist keine fertig gebaute JAR im Repository enthalten.
 
-## Bestätigter Ist-Stand (12.10.2026)
+## Schnellstart – frisches Debian 13
 
-- OpenJDK 25.0.4.1
-- Stirling PDF unter `/opt/Stirling-PDF`
-- systemd-Dienst `stirlingpdf` läuft und startet automatisch
-- Weboberfläche funktioniert auf `http://SERVER-IP:8080`
-- Samba-Freigaben `Scan-Eingang` und `Scan-Ausgang` sind vorhanden; lokale Lese- und Schreibtests als Benutzer `stirling` waren erfolgreich.
-- Grafische Automatisierung `Test`: Scan-Eingang → OCR & Scans bereinigen → Scan-Ausgang; nach Konfigurationsanpassung funktionierte die Verarbeitung nach Anwenderangabe. Ein erneuter End-to-End-Test **nach dem JAR-Austausch** ist noch sinnvoll.
-- **Produktiver QR-Code-Fix (12.10.2026):** Login, PDF-Aufteilen und native QR-Code-Trennung auf Port `8080` erfolgreich vom Anwender getestet; vier Dateien aus der 10-seitigen Test-PDF korrekt erzeugt.
+Auf einer **neuen, noch nicht für Stirling verwendeten** Debian-13-VM als `root`:
+
+```bash
+apt update && apt install -y git ca-certificates
+cd /root
+git clone https://github.com/Markus4771/Stirling.git
+cd Stirling
+bash install.sh --fresh
+```
+
+Empfohlen: mindestens **4 GB RAM**, ausreichend freier Festplattenspeicher (ca. 30 GB) und Internetzugriff während des Builds. Bei geringem RAM richtet das Skript nötigenfalls 4 GB Build-Swap ein. Während der Samba-Manager-Installation wird ein **GUI-Administratorpasswort (mindestens 12 Zeichen)** abgefragt; SMB-Benutzer werden anschließend in der Oberfläche angelegt.
+
+| Dienst | Zugriff |
+| --- | --- |
+| Stirling PDF | `http://SERVER-IP:8080` |
+| Samba Share Manager | `http://SERVER-IP:8085` (Benutzer `admin`) |
+| Samba-Dateifreigaben | `\\\\SERVER-IP\\Freigabename` |
+
+Die Weboberfläche auf Port 8085 **nur im geschützten LAN oder hinter HTTPS und zusätzlicher Zugangskontrolle** verwenden. Nicht ungeschützt ins Internet freigeben.
+
+## SMB-Freigaben und Windows-Netzlaufwerke
+
+Im Samba-Share-Manager für jede Freigabe einen Namen, Ordner-Typ, Rechte sowie SMB-Benutzernamen und Passwort vergeben. Der **gleiche, bereits vom Manager verwaltete SMB-Benutzer** kann auf mehreren Freigaben mit seinem **identischen Passwort** genutzt werden. Das Passwort gehört zum Benutzer; eine Änderung aktualisiert seine Anmeldedaten für alle zugewiesenen Freigaben. Vorhandene Benutzer fremder Anwendungen werden nicht ungeprüft übernommen.
+
+Beispiel: `Scan-Eingang1` und `Scan-Ausgang` beide mit `TestSamba` und demselben Passwort einrichten. Anschließend in der Windows-Eingabeaufforderung:
+
+```cmd
+net use W: \\\\SERVER-IP\\Scan-Eingang1 /user:TestSamba * /persistent:yes
+net use X: \\\\SERVER-IP\\Scan-Ausgang /user:TestSamba * /persistent:yes
+```
+
+Windows unterstützt zu derselben Serveradresse normalerweise nicht gleichzeitig unterschiedliche SMB-Anmeldungen. Wenn noch Verbindungen mit anderen Benutzern bestehen, diese **gezielt** mit `net use` prüfen und trennen; nicht pauschal alle Netzlaufwerke löschen.
+
+## Ordnerberechtigungen für Stirling PDF
+
+Beim Anlegen verwalteter Freigaben setzt das Tool ACLs für `stirling`; für vorhandene Freigaben gibt es die Aktion **„Stirling-Zugriffsrechte setzen“**. Eigentümer und bestehende Dokumente werden dabei nicht pauschal geändert. Die Zugriffsrechte prüfen:
+
+```bash
+runuser -u stirling -- test -r /srv/samba-shares/Scan-Eingang1 && echo "Lesen OK"
+runuser -u stirling -- test -w /srv/samba-shares/Scan-Eingang1 && echo "Schreiben OK"
+```
+
+**Zusätzlich erforderlich:** In Stirling PDF unter **Einstellungen für Ordnerzugriff** `/srv/samba-shares` als erlaubtes Stammverzeichnis hinterlegen. Die Linux-ACL allein beseitigt die Meldung „Dieser Ordner ist nicht erlaubt“ nicht. Die individuelle Processor-Pipeline sowie eine mögliche Paperless-Anbindung sind separat zu konfigurieren.
+
+## Wartung, Updates und Prüfung
+
+```bash
+systemctl status stirlingpdf.service samba-share-manager.service smbd.service --no-pager
+testparm -s
+```
+
+Eine **bereits installierte** Maschine **niemals** mit `--fresh` überschreiben. Samba-Oberfläche aus dem vorhandenen Git-Checkout aktualisieren:
+
+```bash
+cd /root/Stirling
+git pull
+bash scripts/update-samba-ui.sh
+```
+
+Für die Neuinstallation und gezielte Stirling-Upgrades sind die Modi `--fresh`, `--upgrade` und `--samba-only` dokumentiert in **[INSTALLATION.md](INSTALLATION.md)**. Die Skripte richten **keine individuellen SMB-Freigaben und keine Processor-Pipelines** automatisch ein.
+
+**Teststatus:** Die aktualisierten Skripte sind eingecheckt; ein vollständiger End-to-End-Test aller aktuellen Funktionen auf einer vollständig frischen Debian-13-VM steht noch aus.
+
+---
+
+## Historische Einrichtung und Entwicklungsnotizen
+
+Die folgenden älteren Abschnitte beschreiben frühere manuelle Installationsschritte und Tests auf dem bisherigen Scanner. Sie sind **nicht** die empfohlene Vorgehensweise für eine Neuinstallation. Maßgeblich ist der Schnellstart oben.
 
 ## 1. Debian vorbereiten
 
@@ -330,7 +391,7 @@ Weboberfläche: `http://SERVER-IP:8085/`. Ohne TLS ausschließlich im geschützt
 
 **Hinweis:** Die automatische Samba-Integration ist in GitHub implementiert, auf einem frischen System aber noch nicht end-to-end getestet.
 
-## Aktueller Gesamtstand für frisches Debian 13 (13.10.2026)
+## Frühere Zusammenfassung (13.10.2026; siehe aktuellen Schnellstart oben)
 
 Auf einer **leeren Debian-13-amd64-VM** als root installieren:
 
