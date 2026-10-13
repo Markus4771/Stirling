@@ -63,6 +63,17 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(401,'<main><h1>Anmeldung erforderlich</h1></main>',True);return False
         return True
 
+    def must_change_password(self):
+        try:
+            with open(AUTH) as stream:
+                return bool(json.load(stream).get('must_change',False))
+        except (OSError,ValueError):
+            return True
+
+    def password_change_page(self,message='',is_error=False):
+        notice=('<div class="notice'+(' err' if is_error else '')+'">'+html.escape(message)+'</div>') if message else ''
+        self.respond(200,'''<main style="max-width:550px"><section class="card"><h1>Administratorpasswort ändern</h1><p>Aus Sicherheitsgründen musst du beim ersten Anmelden das voreingestellte Passwort ändern. Bis dahin ist die Freigabenverwaltung gesperrt.</p>'''+notice+'''<form method="post" action="/change-admin-password"><label>Neues Passwort (mindestens 12 Zeichen)</label><input type="password" name="password" minlength="12" required autocomplete="new-password"><label>Passwort wiederholen</label><input type="password" name="confirm" minlength="12" required autocomplete="new-password"><button type="submit">Passwort ändern</button></form></section></main>''')
+
     def page(self,message='',is_error=False,revealed=None):
         data=helper('list')
         rows=''
@@ -98,11 +109,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.guard():return
         if self.path!='/':self.respond(404,'<main>Nicht gefunden</main>');return
+        if self.must_change_password():
+            self.password_change_page();return
         self.page()
 
     def do_POST(self):
         if not self.guard():return
-        if self.path not in ('/create','/update','/delete','/set-path','/credentials','/reveal','/grant-acl'):
+        if self.path not in ('/create','/update','/delete','/set-path','/credentials','/reveal','/grant-acl','/change-admin-password'):
             self.respond(404,'<main>Nicht gefunden</main>');return
         origin=self.headers.get('Origin')
         expected=f'http://{self.headers.get("Host","")}'
@@ -112,6 +125,20 @@ class Handler(BaseHTTPRequestHandler):
             length=int(self.headers.get('Content-Length','0'))
             if not (0<length<4096):raise ValueError()
             form=parse_qs(self.rfile.read(length).decode())
+            if self.path=='/change-admin-password':
+                password=form.get('password',[''])[0]
+                confirm=form.get('confirm',[''])[0]
+                if password!=confirm:
+                    self.password_change_page('Passwörter stimmen nicht überein.',True);return
+                if len(password)<12 or len(password)>256 or password=='admin123':
+                    self.password_change_page('Mindestens 12 Zeichen; das Startpasswort ist nicht zulässig.',True);return
+                result=helper('change-admin-password',stdin_data=password)
+                if not result.get('ok'):
+                    self.password_change_page(result.get('error','Passwortänderung fehlgeschlagen'),True);return
+                self.respond(401,'<main><h1>Passwort geändert</h1><p>Bitte mit dem neuen Passwort anmelden. Falls der Browser weiterhin die alten Zugangsdaten sendet, Browserfenster schließen und erneut öffnen.</p></main>',True)
+                return
+            if self.must_change_password():
+                self.password_change_page('Zuerst das Administratorpasswort ändern.',True);return
             name=form.get('name',[''])[0]
             if self.path=='/reveal':
                 result=helper('reveal',name)
