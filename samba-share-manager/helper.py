@@ -106,7 +106,7 @@ def grant_stirling_access(path):
 def change_gui_password():
     auth_path=Path('/etc/samba-share-manager/auth.json')
     if not auth_path.is_file(): fail('GUI-Authentifizierung nicht eingerichtet')
-    password=sys.stdin.readline().rstrip('\\n')
+    password=sys.stdin.readline().rstrip('\n')
     if len(password)<12 or len(password)>256 or password=='admin123':
         fail('Neues Passwort muss mindestens 12 Zeichen haben und darf nicht admin123 sein')
     old=json.loads(auth_path.read_text())
