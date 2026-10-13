@@ -127,8 +127,7 @@ def main():
         if name not in entries: fail('Freigabe nicht gefunden')
         login=sys.argv[3]
         if not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{2,30}',login): fail('SMB-Benutzer: 3–31 Zeichen, beginnend mit einem Buchstaben; erlaubt sind Buchstaben, Zahlen, _ und -')
-        for share,entry in entries.items():
-            if share!=name and entry.get('valid users')==login: fail('Samba-Benutzer bereits einer anderen Freigabe zugeordnet')
+        linked=[share for share,entry in entries.items() if share!=name and entry.get('valid users')==login]
         password=sys.stdin.readline().rstrip('\n')
         previous_login=entries[name].get('valid users','')
         if not password:
@@ -138,7 +137,7 @@ def main():
         import pwd
         try:
             pwd.getpwnam(login)
-            if entries[name].get('valid users')!=login:
+            if entries[name].get('valid users')!=login and not linked:
                 fail('Bestehender Linux-Benutzer kann aus Sicherheitsgründen nicht übernommen werden')
         except KeyError:
             result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
@@ -148,6 +147,8 @@ def main():
         entries[name]['valid users']=login
         put(entries)
         save_password(name,password)
+        for shared_name in linked:
+            save_password(shared_name,password)
         message=('SMB-Benutzer geändert. Der bisherige Benutzer bleibt als Systemkonto bestehen.' if login!=previous_login else 'SMB-Passwort aktualisiert.')
         print(json.dumps({'ok':True,'message':message,'user':login}))
         return
@@ -187,12 +188,17 @@ def main():
                 fail('SMB-Benutzer: 3–31 Zeichen, beginnend mit einem Buchstaben; erlaubt sind Buchstaben, Zahlen, _ und -')
             password=sys.stdin.readline().rstrip('\n')
             if len(password)<12 or len(password)>256: fail('SMB-Passwort muss 12 bis 256 Zeichen haben')
-            if any(v.get('valid users')==login for v in entries.values()):
-                fail('SMB-Benutzer wird bereits für eine andere Freigabe verwendet')
+            linked=[share for share,v in entries.items() if v.get('valid users')==login]
+            if linked:
+                if not all(share in password_vault() for share in linked):
+                    fail('Bestehender SMB-Benutzer hat kein im Manager hinterlegtes Passwort. Bitte Passwort zuerst bei vorhandener Freigabe neu setzen.')
+                if password != reveal_password(linked[0]):
+                    fail('Das Passwort stimmt nicht mit dem bereits vorhandenen SMB-Benutzer ueberein.')
             import pwd
             try:
                 pwd.getpwnam(login)
-                fail('Linux-Benutzer '+login+' existiert bereits, aber die Freigabe ist ihm nicht zugeordnet. Möglicherweise ist er nach einem früheren fehlgeschlagenen Versuch übrig geblieben. Bitte einen anderen SMB-Benutzernamen verwenden oder das Konto erst prüfen.')
+                if not linked:
+                    fail('Linux-Benutzer '+login+' existiert bereits und wird nicht durch den Share Manager verwaltet.')
             except KeyError:
                 pass
         if action=='create' and any(n.casefold()==name.casefold() for n in entries): fail('Freigabe existiert bereits')
@@ -240,7 +246,7 @@ def main():
             os.chown(directory,owner.pw_uid,owner.pw_gid)
             os.chmod(directory,0o2770)
         if directory.is_symlink(): fail('Symbolische Links sind nicht erlaubt')
-        if action=='create':
+        if action=='create' and not linked:
             result=subprocess.run(['useradd','--system','--no-create-home','--comment','Samba Share Manager','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
             if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden: '+(result.stderr or result.stdout)[-350:])
             result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\n'+password+'\n',capture_output=True,text=True,timeout=15)
@@ -248,6 +254,8 @@ def main():
                 # Only remove the fresh, as-yet-unused user created above.
                 subprocess.run(['userdel',login],capture_output=True,text=True)
                 fail('SMB-Passwort konnte nicht gesetzt werden: '+(result.stderr or result.stdout)[-200:])
+        # An existing manager-owned account is simply assigned to the new share.
+        # Its Samba password is never changed by attaching a second share.
         entries[name]={'path':str(directory),'browseable':'yes','read only':'no' if writable=='yes' else 'yes',
                        'valid users':(login if action=='create' else entries[name].get('valid users','markus')),'force user':owner.pw_name,
                        'comment':('Paperless Consume' if preset=='paperless' else 'Verwaltet durch Samba Share Manager'),
