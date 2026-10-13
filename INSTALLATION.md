@@ -148,6 +148,11 @@ Das Skript baut Stirling PDF mit der QR-Erweiterung, installiert Stirling auf Po
 
 ## Erstanmeldung an der Samba-Weboberfläche (Stand 13.10.2026)
 
-Bei einer **frischen Installation** erstellt das Setup ein **zufälliges Einmalpasswort** für den Webadministrator `admin` und zeigt es **einmal im Terminal** an. Beim ersten Login unter `http://SERVER-IP:8085` wird ausschließlich die Seite zur Passwortänderung freigeschaltet. Das neue Administratorpasswort muss mindestens **12 Zeichen** lang sein. Erst danach kann die Freigabenverwaltung genutzt werden.
+Bei einer **frischen Installation** erstellt das Setup ein **Startpasswort `admin123`** für den Webadministrator `admin` und zeigt es **einmal im Terminal** an. Beim ersten Login unter `http://SERVER-IP:8085` wird ausschließlich die Seite zur Passwortänderung freigeschaltet. Das neue Administratorpasswort muss mindestens **12 Zeichen** lang sein. Erst danach kann die Freigabenverwaltung genutzt werden.
 
 Aus Sicherheitsgründen wird kein allgemein bekanntes festes Startpasswort ausgeliefert. Bei Updates bleiben bereits bestehende Zugangsdaten unverändert; eine Neuinstallation darf bestehende Anmeldedaten nicht überschreiben. Das Samba-GUI-Passwort ist unabhängig von den SMB-Passwörtern für Windows-Netzlaufwerke. Die Oberfläche nur im vertrauenswürdigen LAN oder hinter TLS betreiben.
+
+
+## GUI-Startpasswort (13.10.2026)
+
+Bei einer **neuen** Samba-Share-Manager-Installation ist der Webzugang zunächst **Benutzer `admin` / Passwort `admin123`**. Beim ersten Login ist die Vergabe eines individuellen neuen Passworts mit **mindestens 12 Zeichen** verpflichtend; bis dahin bleibt die Verwaltung gesperrt. Bestehende Passwortdateien werden beim Installieren nicht überschrieben. **Achtung:** Das bekannte Startpasswort ist unsicher; bis zur Änderung den Zugriff auf Port 8085 auf ein vertrauenswürdiges Administrationsnetz beschränken und keinesfalls öffentlich anbieten.
