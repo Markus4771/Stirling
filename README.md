@@ -50,6 +50,35 @@ runuser -u stirling -- test -w /srv/samba-shares/Scan-Eingang1 && echo "Schreibe
 
 **Zusätzlich erforderlich:** In Stirling PDF unter **Einstellungen für Ordnerzugriff** `/srv/samba-shares` als erlaubtes Stammverzeichnis hinterlegen. Die Linux-ACL allein beseitigt die Meldung „Dieser Ordner ist nicht erlaubt“ nicht. Die individuelle Processor-Pipeline sowie eine mögliche Paperless-Anbindung sind separat zu konfigurieren.
 
+## Fehlerbehebung: GUI-Passwort bei Neuinstallation zu kurz
+
+Falls die Komplettinstallation nach der Samba-Einrichtung mit folgender Meldung abbricht:
+
+```text
+Neues GUI-Passwort fuer Benutzer admin:
+Mindestens 12 Zeichen erforderlich.
+Installation abgebrochen (Zeile ...). Bestehende Installation nicht manuell löschen.
+```
+
+wurde für die **Samba-Share-Manager-Weboberfläche** ein Passwort mit weniger als **12 Zeichen** eingegeben. Das betrifft **nicht** das Stirling-PDF-Anmeldepasswort. Der Stirling-Dienst wurde im Normalfall bereits vorher installiert, die Samba-Manager-Installation ist aber noch nicht fertig.
+
+**Nicht erneut `bash install.sh --fresh` ausführen.** Stattdessen als `root` die Samba-Installation fortsetzen:
+
+```bash
+cd /root/Stirling
+bash install.sh --samba-only
+```
+
+Bei der erneuten Passwortabfrage ein neues GUI-Administratorpasswort mit **mindestens 12 Zeichen** vergeben. Anschließend prüfen:
+
+```bash
+systemctl is-active stirlingpdf.service
+systemctl is-active samba-share-manager.service
+systemctl is-active smbd.service
+```
+
+Die Samba-Oberfläche ist danach unter `http://SERVER-IP:8085` (Benutzer `admin`) erreichbar, sofern alle Dienste erfolgreich gestartet sind. Bereits vorhandene Stirling-Daten, Freigaben und Dokumente **nicht manuell löschen**. Sollte `--samba-only` wegen einer bereits bestehenden Installation abbrechen, zuerst den Dienststatus und die Installationslogs prüfen, anstatt `--fresh` zu erzwingen.
+
 ## Wartung, Updates und Prüfung
 
 ```bash
