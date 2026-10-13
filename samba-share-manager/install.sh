@@ -16,14 +16,14 @@ if [[ ! -f /etc/samba-share-manager/auth.json ]]; then
 python3 - <<'PY'
 import hashlib,json,secrets
 from pathlib import Path
-password=secrets.token_urlsafe(18)
+password='admin123'
 salt=secrets.token_bytes(16)
 rounds=600000
 auth=Path('/etc/samba-share-manager/auth.json')
 auth.write_text(json.dumps({'salt':salt.hex(),'rounds':rounds,
   'digest':hashlib.pbkdf2_hmac('sha256',password.encode(),salt,rounds).hex(),
   'must_change':True}))
-print('Einmalpasswort fuer GUI-Admin (beim ersten Login aendern): '+password)
+print('GUI-Startzugang: admin / admin123; Passwort beim ersten Login sofort aendern.')
 PY
 chown root:samba-gui /etc/samba-share-manager/auth.json
 chmod 640 /etc/samba-share-manager/auth.json
