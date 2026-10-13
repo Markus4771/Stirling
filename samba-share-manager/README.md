@@ -106,3 +106,9 @@ Bei bereits angemeldeten GUI-Administratoren zeigt die Schaltfläche **„◉ Pa
 ## SMB-Benutzernamen (verbindliche Programmregel)
 
 Beim Anlegen und Bearbeiten dürfen SMB-Benutzernamen frei gewählt werden, z. B. `TestSamba`, `scanner01` oder `share_scan`. Kein festes Präfix erforderlich. Zulässig sind **3 bis 31 Zeichen**, der erste muss ein Buchstabe sein; danach sind Groß- und Kleinbuchstaben, Ziffern, Unterstrich und Bindestrich erlaubt. Das GUI prüft dies im Formular, der privilegierte Helper prüft dieselbe Regel serverseitig. Bereits anderweitig vergebene Linux-Konten werden aus Sicherheitsgründen nicht ungeprüft übernommen oder überschrieben. Bestehende Freigaben bleiben erhalten.
+
+## Automatische Stirling-Dateirechte (13.10.2026)
+
+Neue, vom Samba-Manager angelegte Freigaben erhalten automatisch eine POSIX-ACL für den Dienstbenutzer `stirling` auf dem Freigabe-Verzeichnis (`u:stirling:rwx`) sowie eine Default-ACL (`d:u:stirling:rwx`) für neue Unterordner/Dateien. Eigentümer und bestehende Dateien werden nicht geändert. Die GUI bietet unter **Vorhandene Freigaben → Stirling-Zugriffsrechte setzen** dieselbe Aktion nachträglich für bestehende Shares. Beim Pfadwechsel werden die Rechte am neuen Zielordner vergeben. Voraussetzung ist `acl` / `setfacl` auf dem Server.
+
+**Getrennte Freigabe in Stirling:** ACL-Rechte allein erlauben noch keine Ordnerautomatisierung. Zusätzlich muss `/srv/samba-shares` in den Stirling-Einstellungen als zulässiges Stammverzeichnis konfiguriert werden. Für bereits bestehende Dateien (vor der ACL-Änderung) werden keine rekursiven Änderungen vorgenommen.
