@@ -456,3 +456,17 @@ Das Skript baut Stirling PDF mit der QR-Erweiterung, installiert Stirling auf Po
 ## GUI-Startpasswort (13.10.2026)
 
 Bei einer **neuen** Samba-Share-Manager-Installation ist der Webzugang zunächst **Benutzer `admin` / Passwort `admin123`**. Beim ersten Login ist die Vergabe eines individuellen neuen Passworts mit **mindestens 12 Zeichen** verpflichtend; bis dahin bleibt die Verwaltung gesperrt. Bestehende Passwortdateien werden beim Installieren nicht überschrieben. **Achtung:** Das bekannte Startpasswort ist unsicher; bis zur Änderung den Zugriff auf Port 8085 auf ein vertrauenswürdiges Administrationsnetz beschränken und keinesfalls öffentlich anbieten.
+
+### Erste Passwortänderung: Anmeldung schlägt erneut fehl
+
+Die Weboberfläche verwendet HTTP Basic Authentication. Browser können deshalb die **alte Anmeldung zwischenspeichern**, selbst wenn das Administratorpasswort erfolgreich geändert wurde. Ab dem aktualisierten Samba-Manager erscheint nach dem Speichern eine Bestätigungsseite statt einer sofortigen erneuten HTTP-Login-Abfrage. Anschließend die Verwaltungsoberfläche in einem **neuen privaten Browserfenster** mit Benutzer `admin` und dem neu festgelegten Passwort öffnen.
+
+Für eine bestehende Installation Code aktualisieren, ohne Freigaben oder Passwortdatei zu ersetzen:
+
+```bash
+cd /root/Stirling
+git pull
+bash scripts/update-samba-ui.sh
+```
+
+Wenn die Passwortänderung **vor der Bestätigungsseite** scheitert, die rote Fehlermeldung und die letzten Dienstlogs prüfen: `journalctl -u samba-share-manager.service -n 40 --no-pager`. Keine Passwörter in Logs oder Chat kopieren. Bei verlorenem GUI-Passwort steht `bash scripts/reset-samba-gui-admin.sh` zur Verfügung; es setzt nur die Webanmeldung zurück und vergibt ein neues Einmalpasswort.
