@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Privileged, narrowly scoped Samba share operations."""
-import json, os, re, subprocess, sys, tempfile
+import json, os, re, subprocess, sys, tempfile, hashlib, secrets
 from cryptography.fernet import Fernet, InvalidToken
 from pathlib import Path
 
@@ -103,10 +103,38 @@ def grant_stirling_access(path):
         result=subprocess.run(['runuser','-u','stirling','--','test',permission,str(path)],capture_output=True,text=True)
         if result.returncode: fail('Stirling-Benutzer kann Zielordner nicht lesen/schreiben: '+str(path))
 
+def change_gui_password():
+    auth_path=Path('/etc/samba-share-manager/auth.json')
+    if not auth_path.is_file(): fail('GUI-Authentifizierung nicht eingerichtet')
+    password=sys.stdin.readline().rstrip('\\n')
+    if len(password)<12 or len(password)>256 or password=='admin123':
+        fail('Neues Passwort muss mindestens 12 Zeichen haben und darf nicht admin123 sein')
+    old=json.loads(auth_path.read_text())
+    salt=secrets.token_bytes(16)
+    rounds=600000
+    record={'salt':salt.hex(),'rounds':rounds,
+            'digest':hashlib.pbkdf2_hmac('sha256',password.encode(),salt,rounds).hex(),
+            'must_change':False}
+    fd,tmp=tempfile.mkstemp(prefix='.auth-',dir=str(auth_path.parent))
+    try:
+        with os.fdopen(fd,'w') as out:
+            json.dump(record,out)
+            out.flush();os.fsync(out.fileno())
+        os.chown(tmp,auth_path.stat().st_uid,auth_path.stat().st_gid)
+        os.chmod(tmp,0o640)
+        os.replace(tmp,auth_path)
+    finally:
+        if os.path.exists(tmp):os.unlink(tmp)
+    print(json.dumps({'ok':True,'message':'GUI-Passwort geändert. Bitte erneut anmelden.'}))
+
 def main():
     if os.geteuid()!=0: fail('Root-Berechtigung erforderlich')
-    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path','credentials','reveal','grant-acl'): fail('Ungueltige Aktion')
+    if len(sys.argv)<2 or sys.argv[1] not in ('list','create','delete','update','set-path','credentials','reveal','grant-acl','change-admin-password'): fail('Ungueltige Aktion')
     action=sys.argv[1]
+    if action=='change-admin-password':
+        if len(sys.argv)!=2: fail('Ungueltige Argumente')
+        change_gui_password()
+        return
     entries=read_entries()
     if action=='grant-acl':
         if len(sys.argv)!=3 or not NAME_RE.fullmatch(sys.argv[2]) or sys.argv[2] not in entries: fail('Freigabe nicht gefunden')
