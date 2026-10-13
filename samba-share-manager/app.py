@@ -81,6 +81,7 @@ class Handler(BaseHTTPRequestHandler):
             <form method="post" action="/update" class="inline actions"><input type="hidden" name="name" value="{name}"><input type="hidden" name="preset" value="{preset}">
             <select name="writable" style="width:auto"><option value="yes" {'selected' if share.get('writable') else ''}>Lesen und Schreiben</option><option value="no" {'selected' if not share.get('writable') else ''}>Nur lesen</option></select><button class="secondary">Rechte speichern</button></form>
             <form method="post" action="/set-path" class="inline actions"><input type="hidden" name="name" value="{name}"><input name="path" value="{path}" style="flex:1;min-width:190px" required><button class="secondary">Pfad übernehmen</button></form>
+            <form method="post" action="/grant-acl" class="actions"><input type="hidden" name="name" value="{name}"><button type="submit" class="secondary">Stirling-Zugriffsrechte setzen</button></form>
             <form method="post" action="/delete" class="actions"><input type="hidden" name="name" value="{name}"><button class="danger">Freigabe entfernen</button></form></section>'''
         notice=('<div class="notice'+(' err' if is_error else '')+'">'+html.escape(message)+'</div>') if message else ''
         if not data.get('ok'):notice='<div class="notice err">'+html.escape(data.get('error','Fehler'))+'</div>'
@@ -101,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if not self.guard():return
-        if self.path not in ('/create','/update','/delete','/set-path','/credentials','/reveal'):
+        if self.path not in ('/create','/update','/delete','/set-path','/credentials','/reveal','/grant-acl'):
             self.respond(404,'<main>Nicht gefunden</main>');return
         origin=self.headers.get('Origin')
         expected=f'http://{self.headers.get("Host","")}'
@@ -119,7 +120,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self.page(result.get('error','Passwort nicht verfügbar'),True)
                 return
-            result=(helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('credentials',name,form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/credentials' else helper('delete',name) if self.path=='/delete' else helper('create',name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0],form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/create' else helper('update',name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
+            result=(helper('grant-acl',name) if self.path=='/grant-acl' else helper('set-path',name,form.get('path',[''])[0]) if self.path=='/set-path' else helper('credentials',name,form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/credentials' else helper('delete',name) if self.path=='/delete' else helper('create',name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0],form.get('user',[''])[0],stdin_data=form.get('password',[''])[0]) if self.path=='/create' else helper('update',name,form.get('preset',['general'])[0],form.get('writable',['yes'])[0]))
             self.page(result.get('message',result.get('error','Fehler')),not result.get('ok'))
         except (ValueError,UnicodeError):self.respond(400,'<main>Ungueltige Anfrage</main>')
 
