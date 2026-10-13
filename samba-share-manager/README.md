@@ -122,3 +122,9 @@ Bei Änderung des Passworts für einen mehrfach verwendeten Benutzer wird dieses
 **Windows:** Freigaben auf derselben Server-IP müssen mit denselben SMB-Zugangsdaten verbunden werden, z. B. `\\\\192.168.0.54\\Scan-Eingang1` auf `W:` und `\\\\192.168.0.54\\Scan-Ausgang` auf `X:`. Bestehende Windows-Verbindungen mit abweichenden Zugangsdaten ggf. zuvor gezielt trennen.
 
 Die Funktion ist im Repository implementiert; Live-Test auf dem Server steht noch aus.
+
+## Erstanmeldung an der Samba-Weboberfläche (Stand 13.10.2026)
+
+Bei einer **frischen Installation** erstellt das Setup ein **zufälliges Einmalpasswort** für den Webadministrator `admin` und zeigt es **einmal im Terminal** an. Beim ersten Login unter `http://SERVER-IP:8085` wird ausschließlich die Seite zur Passwortänderung freigeschaltet. Das neue Administratorpasswort muss mindestens **12 Zeichen** lang sein. Erst danach kann die Freigabenverwaltung genutzt werden.
+
+Aus Sicherheitsgründen wird kein allgemein bekanntes festes Startpasswort ausgeliefert. Bei Updates bleiben bereits bestehende Zugangsdaten unverändert; eine Neuinstallation darf bestehende Anmeldedaten nicht überschreiben. Das Samba-GUI-Passwort ist unabhängig von den SMB-Passwörtern für Windows-Netzlaufwerke. Die Oberfläche nur im vertrauenswürdigen LAN oder hinter TLS betreiben.
