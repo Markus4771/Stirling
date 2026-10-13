@@ -15,7 +15,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y samba smbclient sudo python3 python3-cryptography acl
 id stirling >/dev/null || { echo "Systembenutzer stirling fehlt." >&2; exit 1; }
-# The bundled manager uses the SMB login 'markus'; create the account only if absent.
+# Legacy force-user for general shares: local filesystem account only.
 if ! id markus >/dev/null 2>&1; then
   useradd -m -s /bin/bash markus
   echo "Linux-Konto markus angelegt (ohne initiales Linux-Passwort)."
@@ -24,14 +24,8 @@ install -d -o stirling -g stirling -m 0750 /opt/Stirling-PDF/pipeline/watchedFol
 install -d -o stirling -g stirling -m 0750 /opt/Stirling-PDF/pipeline/finishedFolders
 install -d -o root -g root -m 0755 /srv/samba-shares
 systemctl enable --now smbd.service
-if ! pdbedit -L 2>/dev/null | grep -q '^markus:'; then
-  if [[ ! -t 0 ]]; then
-    echo "Interaktive Eingabe erforderlich: SMB-Passwort für markus. Führe im Terminal aus: sudo smbpasswd -a markus" >&2
-    exit 1
-  fi
-  echo "Bitte jetzt ein eigenes SMB-Passwort für den Benutzer markus vergeben:"
-  smbpasswd -a markus
-fi
+# SMB users and passwords are created later by the web GUI per share.
+# There is no need for a preconfigured Samba login for markus.
 cd "$ROOT/samba-share-manager"
 export SHARE_GUI_PORT="${SHARE_GUI_PORT:-8085}"
 bash install.sh
