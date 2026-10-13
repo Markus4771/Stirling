@@ -16,7 +16,7 @@ cd Stirling
 bash install.sh --fresh
 ```
 
-Empfohlen: mindestens **4 GB RAM**, ausreichend freier Festplattenspeicher (ca. 30 GB) und Internetzugriff während des Builds. Bei geringem RAM richtet das Skript nötigenfalls 4 GB Build-Swap ein. Während der Samba-Manager-Installation wird ein **GUI-Administratorpasswort (mindestens 12 Zeichen)** abgefragt; SMB-Benutzer werden anschließend in der Oberfläche angelegt.
+Empfohlen: mindestens **4 GB RAM**, ausreichend freier Festplattenspeicher (ca. 30 GB) und Internetzugriff während des Builds. Bei geringem RAM richtet das Skript nötigenfalls 4 GB Build-Swap ein. Bei der ersten Samba-Manager-Installation erscheint im Terminal ein **zufälliges Einmalpasswort** für `admin`. Nach dem ersten Login muss ein eigenes Passwort mit mindestens **12 Zeichen** vergeben werden. SMB-Benutzer werden anschließend in der Oberfläche angelegt.
 
 | Dienst | Zugriff |
 | --- | --- |
@@ -25,6 +25,17 @@ Empfohlen: mindestens **4 GB RAM**, ausreichend freier Festplattenspeicher (ca. 
 | Samba-Dateifreigaben | `\\\\SERVER-IP\\Freigabename` |
 
 Die Weboberfläche auf Port 8085 **nur im geschützten LAN oder hinter HTTPS und zusätzlicher Zugangskontrolle** verwenden. Nicht ungeschützt ins Internet freigeben.
+
+## Erstanmeldung am Samba-Share-Manager
+
+Bei einer **frischen Installation** wird ein **zufälliges Einmalpasswort** für den GUI-Benutzer `admin` erzeugt und **im Terminal angezeigt**. Dieses Passwort unbedingt direkt bei der Installation notieren.
+
+1. `http://SERVER-IP:8085` öffnen und als `admin` mit dem angezeigten Einmalpasswort anmelden.
+2. Es erscheint zunächst ausschließlich die Seite **Administratorpasswort ändern**.
+3. Ein neues, individuelles Passwort mit **mindestens 12 Zeichen** eingeben und bestätigen.
+4. Danach mit dem neuen Passwort erneut anmelden; erst dann ist die Freigabenverwaltung verfügbar.
+
+Das gewünschte feste Startpasswort `admin123` wird **nicht** ausgeliefert. Es wäre allgemein bekannt und für eine aus dem Netzwerk erreichbare Weboberfläche ungeeignet. Bestehende Administratorpasswörter werden bei Updates **nicht überschrieben**. GUI-Passwort und SMB-Passwörter für Windows sind unabhängig.
 
 ## SMB-Freigaben und Windows-Netzlaufwerke
 
@@ -50,7 +61,7 @@ runuser -u stirling -- test -w /srv/samba-shares/Scan-Eingang1 && echo "Schreibe
 
 **Zusätzlich erforderlich:** In Stirling PDF unter **Einstellungen für Ordnerzugriff** `/srv/samba-shares` als erlaubtes Stammverzeichnis hinterlegen. Die Linux-ACL allein beseitigt die Meldung „Dieser Ordner ist nicht erlaubt“ nicht. Die individuelle Processor-Pipeline sowie eine mögliche Paperless-Anbindung sind separat zu konfigurieren.
 
-## Fehlerbehebung: GUI-Passwort bei Neuinstallation zu kurz
+## Fehlerbehebung: Abbruch durch zu kurzes GUI-Passwort (ältere Installerversion)
 
 Falls die Komplettinstallation nach der Samba-Einrichtung mit folgender Meldung abbricht:
 
@@ -60,7 +71,7 @@ Mindestens 12 Zeichen erforderlich.
 Installation abgebrochen (Zeile ...). Bestehende Installation nicht manuell löschen.
 ```
 
-wurde für die **Samba-Share-Manager-Weboberfläche** ein Passwort mit weniger als **12 Zeichen** eingegeben. Das betrifft **nicht** das Stirling-PDF-Anmeldepasswort. Der Stirling-Dienst wurde im Normalfall bereits vorher installiert, die Samba-Manager-Installation ist aber noch nicht fertig.
+wurde mit einer **älteren Installerversion** für die Samba-Share-Manager-Weboberfläche ein Passwort mit weniger als **12 Zeichen** eingegeben. Das betrifft **nicht** das Stirling-PDF-Anmeldepasswort. Der Stirling-Dienst wurde im Normalfall bereits vorher installiert, die Samba-Manager-Installation ist aber noch nicht fertig.
 
 **Nicht erneut `bash install.sh --fresh` ausführen.** Stattdessen als `root` die Samba-Installation fortsetzen:
 
@@ -69,7 +80,7 @@ cd /root/Stirling
 bash install.sh --samba-only
 ```
 
-Bei der erneuten Passwortabfrage ein neues GUI-Administratorpasswort mit **mindestens 12 Zeichen** vergeben. Anschließend prüfen:
+Mit dem **aktuellen Installer** wird stattdessen ein zufälliges Einmalpasswort im Terminal ausgegeben. Dieses beim ersten Login verwenden und anschließend ein neues GUI-Administratorpasswort mit **mindestens 12 Zeichen** festlegen. Anschließend prüfen:
 
 ```bash
 systemctl is-active stirlingpdf.service
@@ -399,7 +410,7 @@ Artefakt: `app/core/build/libs/stirling-pdf-3.1.0.jar`. Vor produktiven Änderun
 
 ## Samba-Verwaltungsoberfläche (ab 12.10.2026)
 
-Die Root-`install.sh` ruft bei Neuinstallation bzw. Update zusätzlich den vorhandenen `samba-share-manager` auf. Dieser installiert Samba, den systemd-Dienst `samba-share-manager.service` und die Verwaltungs-GUI auf **Port 8085**. Die Oberfläche verwendet **Benutzer `admin`** und fragt bei der Einrichtung ein eigenes Passwort von mindestens 12 Zeichen ab. Für SMB-Freigaben wird ein `markus`-Konto verwendet; ein bestehendes Konto wird beibehalten, ein fehlendes Linux-Konto nur ohne initiales Linux-Passwort angelegt ; das SMB-Passwort wird später im Manager vergeben.
+Die Root-`install.sh` ruft bei Neuinstallation bzw. Update zusätzlich den vorhandenen `samba-share-manager` auf. Dieser installiert Samba, den systemd-Dienst `samba-share-manager.service` und die Verwaltungs-GUI auf **Port 8085**. Die Oberfläche verwendet **Benutzer `admin`** und erzeugt bei einer frischen Installation ein zufälliges Einmalpasswort, das beim ersten Login geändert werden muss. Für SMB-Freigaben wird ein `markus`-Konto verwendet; ein bestehendes Konto wird beibehalten, ein fehlendes Linux-Konto nur ohne initiales Linux-Passwort angelegt ; das SMB-Passwort wird später im Manager vergeben.
 
 Auf einer bereits eingerichteten Stirling-Instanz (z. B. `scanner2`) **nicht `--fresh`** aufrufen, sondern:
 
@@ -432,7 +443,7 @@ cd Stirling
 bash install.sh --fresh
 ```
 
-Das Skript baut Stirling PDF mit der QR-Erweiterung, installiert Stirling auf Port **8080** sowie Samba und den eigenen Samba-Share-Manager auf Port **8085**. Es installiert Java 25, Node/npm, go-task, Python/Cryptography und PDF-/OCR-Werkzeuge. Bei 4 GB RAM wird bei Bedarf Swap für den Build aktiviert. Das GUI-Admin-Passwort (mindestens 12 Zeichen) wird während der Installation vergeben. Ein SMB-Passwort für das lokale Dateisystemkonto `markus` wird **nicht mehr vorab verlangt**.
+Das Skript baut Stirling PDF mit der QR-Erweiterung, installiert Stirling auf Port **8080** sowie Samba und den eigenen Samba-Share-Manager auf Port **8085**. Es installiert Java 25, Node/npm, go-task, Python/Cryptography und PDF-/OCR-Werkzeuge. Bei 4 GB RAM wird bei Bedarf Swap für den Build aktiviert. Ein zufälliges GUI-Admin-Einmalpasswort wird während der Installation angezeigt; nach dem ersten Login ist ein eigenes Passwort mit mindestens 12 Zeichen festzulegen. Ein SMB-Passwort für das lokale Dateisystemkonto `markus` wird **nicht mehr vorab verlangt**.
 
 **SMB-Benutzer mehrfach verwenden:** Direkt beim Anlegen jeder Freigabe Benutzername und Passwort angeben. Bereits vom Manager verwaltete SMB-Benutzer können mit demselben Passwort für weitere Freigaben verwendet werden. Passwortänderungen an gemeinsam genutzten Konten betreffen alle verknüpften Freigaben. Passwortanzeige per Augensymbol innerhalb der angemeldeten Verwaltungsoberfläche. Für Windows-Verbindungen auf dieselbe Server-IP denselben SMB-Benutzer verwenden.
 
@@ -440,8 +451,3 @@ Das Skript baut Stirling PDF mit der QR-Erweiterung, installiert Stirling auf Po
 
 **Prüfung:** `systemctl is-active stirlingpdf smbd samba-share-manager`, `testparm -s`, GUI-Login auf Port 8080 und 8085, QR-Trennung sowie SMB-Verbindung mit zwei Netzlaufwerken testen. Das Skript prüft Dienste und Erreichbarkeit, jedoch noch nicht sämtliche fachlichen Abläufe. **Der gesamte aktuelle Neuinstallationsstand wurde noch nicht auf einer frisch aufgesetzten VM end-to-end verifiziert.**
 
-## Erstanmeldung an der Samba-Weboberfläche (Stand 13.10.2026)
-
-Bei einer **frischen Installation** erstellt das Setup ein **zufälliges Einmalpasswort** für den Webadministrator `admin` und zeigt es **einmal im Terminal** an. Beim ersten Login unter `http://SERVER-IP:8085` wird ausschließlich die Seite zur Passwortänderung freigeschaltet. Das neue Administratorpasswort muss mindestens **12 Zeichen** lang sein. Erst danach kann die Freigabenverwaltung genutzt werden.
-
-Aus Sicherheitsgründen wird kein allgemein bekanntes festes Startpasswort ausgeliefert. Bei Updates bleiben bereits bestehende Zugangsdaten unverändert; eine Neuinstallation darf bestehende Anmeldedaten nicht überschreiben. Das Samba-GUI-Passwort ist unabhängig von den SMB-Passwörtern für Windows-Netzlaufwerke. Die Oberfläche nur im vertrauenswürdigen LAN oder hinter TLS betreiben.
