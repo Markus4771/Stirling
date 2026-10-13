@@ -168,7 +168,7 @@ def main():
             import pwd
             try:
                 pwd.getpwnam(login)
-                fail('Vorhandener Linux-Benutzer kann aus Sicherheitsgründen nicht übernommen werden')
+                fail('Linux-Benutzer '+login+' existiert bereits, aber die Freigabe ist ihm nicht zugeordnet. Möglicherweise ist er nach einem früheren fehlgeschlagenen Versuch übrig geblieben. Bitte einen anderen SMB-Benutzernamen verwenden oder das Konto erst prüfen.')
             except KeyError:
                 pass
         if action=='create' and any(n.casefold()==name.casefold() for n in entries): fail('Freigabe existiert bereits')
@@ -217,10 +217,13 @@ def main():
             os.chmod(directory,0o2770)
         if directory.is_symlink(): fail('Symbolische Links sind nicht erlaubt')
         if action=='create':
-            result=subprocess.run(['useradd','--system','--no-create-home','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
+            result=subprocess.run(['useradd','--system','--no-create-home','--comment','Samba Share Manager','--shell','/usr/sbin/nologin',login],capture_output=True,text=True)
             if result.returncode: fail('Linux-Benutzer konnte nicht angelegt werden: '+(result.stderr or result.stdout)[-350:])
             result=subprocess.run(['smbpasswd','-s','-a',login],input=password+'\n'+password+'\n',capture_output=True,text=True,timeout=15)
-            if result.returncode: fail('SMB-Passwort konnte nicht gesetzt werden: '+result.stderr[-200:])
+            if result.returncode:
+                # Only remove the fresh, as-yet-unused user created above.
+                subprocess.run(['userdel',login],capture_output=True,text=True)
+                fail('SMB-Passwort konnte nicht gesetzt werden: '+(result.stderr or result.stdout)[-200:])
         entries[name]={'path':str(directory),'browseable':'yes','read only':'no' if writable=='yes' else 'yes',
                        'valid users':(login if action=='create' else entries[name].get('valid users','markus')),'force user':owner.pw_name,
                        'comment':('Paperless Consume' if preset=='paperless' else 'Verwaltet durch Samba Share Manager'),
