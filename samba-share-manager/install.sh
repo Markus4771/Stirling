@@ -7,22 +7,27 @@ for c in testparm systemctl python3 visudo; do command -v "$c" >/dev/null || { e
 test -d /opt/Stirling-PDF/pipeline/watchedFolders && test -d /opt/Stirling-PDF/pipeline/finishedFolders || { echo 'Stirling-PDF-Pipeline-Verzeichnisse fehlen'; exit 1; }
 id stirling >/dev/null || { echo 'Stirling-Benutzer fehlt'; exit 1; }
 id markus >/dev/null || { echo 'Linux-Benutzer markus fehlt.'; exit 1; }
-read -r -s -p 'Neues GUI-Passwort fuer Benutzer admin: ' PASS; echo
-[[ ${#PASS} -ge 12 ]] || { echo 'Mindestens 12 Zeichen erforderlich.'; exit 1; }
 if ! id samba-gui >/dev/null 2>&1; then useradd --system --home /nonexistent --shell /usr/sbin/nologin samba-gui; fi
 install -d -o root -g root -m 755 /usr/local/lib/samba-share-manager
 install -d -o root -g samba-gui -m 750 /etc/samba-share-manager
 install -m 755 helper.py /usr/local/lib/samba-share-manager/helper.py
 install -m 755 app.py /usr/local/lib/samba-share-manager/app.py
-SHARE_PASSWORD="$PASS" python3 - <<'PY'
-import hashlib,json,os,secrets
-salt=secrets.token_bytes(16);password=os.environ['SHARE_PASSWORD']
+if [[ ! -f /etc/samba-share-manager/auth.json ]]; then
+python3 - <<'PY'
+import hashlib,json,secrets
+from pathlib import Path
+password=secrets.token_urlsafe(18)
+salt=secrets.token_bytes(16)
 rounds=600000
-with open('/etc/samba-share-manager/auth.json','w') as f: json.dump({'salt':salt.hex(),'rounds':rounds,'digest':hashlib.pbkdf2_hmac('sha256',password.encode(),salt,rounds).hex()},f)
+auth=Path('/etc/samba-share-manager/auth.json')
+auth.write_text(json.dumps({'salt':salt.hex(),'rounds':rounds,
+  'digest':hashlib.pbkdf2_hmac('sha256',password.encode(),salt,rounds).hex(),
+  'must_change':True}))
+print('Einmalpasswort fuer GUI-Admin (beim ersten Login aendern): '+password)
 PY
-unset PASS
 chown root:samba-gui /etc/samba-share-manager/auth.json
 chmod 640 /etc/samba-share-manager/auth.json
+fi
 python3 - <<'PY'
 from pathlib import Path
 import re
